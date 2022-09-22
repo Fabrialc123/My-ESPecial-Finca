@@ -19,15 +19,22 @@
 #include "esp_wifi.h"
 #include "lwip/netdb.h"
 
+#include <pthread.h>
+
 static const char TAG[] = "wifi_app";
+
+//extern int WIFI_CONNECTED;
+// extern pthread_mutex_t mutex_WIFI;
 
 static QueueHandle_t wifi_app_queue_handle;
 
 esp_netif_t* esp_netif_sta = NULL;
 esp_netif_t* esp_netif_ap = NULL;
 
-int s_retry_num = 0;
+pthread_mutex_t mutex_WIFI;
 
+int s_retry_num = 0;
+int WIFI_CONNECTED = 0;
 
 /**
  * WiFi application event handler
@@ -68,6 +75,9 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 		switch(event_id){
 			case IP_EVENT_STA_GOT_IP:
 				ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
+				pthread_mutex_lock(&mutex_WIFI);
+					WIFI_CONNECTED = 1;
+				pthread_mutex_unlock(&mutex_WIFI);
 				break;
 		}
 	}
@@ -113,12 +123,6 @@ static void wifi_app_sta_config(void){
 static void wifi_app_task (void *pvParameters){
 	wifi_app_queue_msg_t msg;
 
-	wifi_app_event_handler_init();
-	wifi_app_default_wifi_init();
-	wifi_app_sta_config();
-
-	ESP_ERROR_CHECK(esp_wifi_start());
-
 	wifi_app_send_message(WIFI_APP_MSG_START_HTTP_SERVER);
 
 	for(;;){
@@ -156,6 +160,14 @@ BaseType_t wifi_app_send_message(wifi_app_msg_e msgID){
 	return xQueueSend(wifi_app_queue_handle, &msg, portMAX_DELAY);
 }
 
+int is_wifi_connected(){
+	int result ;
+pthread_mutex_lock(&mutex_WIFI);
+	result = WIFI_CONNECTED;
+pthread_mutex_unlock(&mutex_WIFI);
+
+return result;
+}
 
 void wifi_app_start(void){
 	ESP_LOGI(TAG, "STARTING WIFI APPLICATION");
@@ -166,8 +178,22 @@ void wifi_app_start(void){
 
 	wifi_app_queue_handle = xQueueCreate(3, sizeof(wifi_app_queue_msg_t));
 
+	wifi_app_event_handler_init();
+	wifi_app_default_wifi_init();
+	wifi_app_sta_config();
+
+	ESP_ERROR_CHECK(esp_wifi_start());
+
+	if(pthread_mutex_init (&mutex_WIFI, NULL) != 0){
+	 ESP_LOGI(TAG,"Failed to initialize the wifi mutex");
+	}
+
 	xTaskCreatePinnedToCore(&wifi_app_task, "wifi_app_task", WIFI_APP_TASK_STACK_SIZE, NULL, WIFI_APP_TASK_PRIORITY, NULL, WIFI_APP_TASK_CORE_ID);
 
+	while(!is_wifi_connected());
+
 }
+
+
 
 

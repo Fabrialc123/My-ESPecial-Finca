@@ -8,6 +8,12 @@
 
 #include "wifi_app.h"
 #include "http_server.h"
+#include "esp_log.h"
+
+#include "mqtt.c"
+
+//static const char TAG[] = "main";
+
 
 void app_main(void)
 {
@@ -19,7 +25,10 @@ void app_main(void)
 	}
 	ESP_ERROR_CHECK(ret);
 
+
 	wifi_app_start();
+
+	mqtt_start();
 
 }
 
