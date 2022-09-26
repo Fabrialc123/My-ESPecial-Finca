@@ -4,15 +4,18 @@
  * Open a Terminal and see all the events at connecting and disconnecting devices.
  */
 
+
 #include "nvs_flash.h"
 
 #include "wifi_app.h"
 #include "http_server.h"
 #include "esp_log.h"
+#include "mqtt_app.h"
 
-#include "mqtt.c"
+#include "tests.c"
 
-//static const char TAG[] = "main";
+
+static const char main_TAG[] = "MAIN";
 
 
 void app_main(void)
@@ -25,10 +28,19 @@ void app_main(void)
 	}
 	ESP_ERROR_CHECK(ret);
 
+    ESP_LOGI(main_TAG, "[APP] Startup..");
+    ESP_LOGI(main_TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
+    ESP_LOGI(main_TAG, "[APP] IDF version: %s", esp_get_idf_version());
+
 
 	wifi_app_start();
 
-	mqtt_start();
+	mqtt_app_start();
+
+
+
+
+	mqtt_app_recollect_test();
 
 }
 

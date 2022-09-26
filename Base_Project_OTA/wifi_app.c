@@ -123,7 +123,15 @@ static void wifi_app_sta_config(void){
 static void wifi_app_task (void *pvParameters){
 	wifi_app_queue_msg_t msg;
 
+	wifi_app_event_handler_init();
+	wifi_app_default_wifi_init();
+	wifi_app_sta_config();
+
+	ESP_ERROR_CHECK(esp_wifi_start());
+
 	wifi_app_send_message(WIFI_APP_MSG_START_HTTP_SERVER);
+
+	ESP_LOGE(TAG,"STACK SIZE: %d",uxTaskGetStackHighWaterMark(NULL));
 
 	for(;;){
 		if (xQueueReceive(wifi_app_queue_handle, &msg, portMAX_DELAY)){
@@ -162,6 +170,7 @@ BaseType_t wifi_app_send_message(wifi_app_msg_e msgID){
 
 int is_wifi_connected(){
 	int result ;
+
 pthread_mutex_lock(&mutex_WIFI);
 	result = WIFI_CONNECTED;
 pthread_mutex_unlock(&mutex_WIFI);
@@ -178,14 +187,9 @@ void wifi_app_start(void){
 
 	wifi_app_queue_handle = xQueueCreate(3, sizeof(wifi_app_queue_msg_t));
 
-	wifi_app_event_handler_init();
-	wifi_app_default_wifi_init();
-	wifi_app_sta_config();
-
-	ESP_ERROR_CHECK(esp_wifi_start());
 
 	if(pthread_mutex_init (&mutex_WIFI, NULL) != 0){
-	 ESP_LOGI(TAG,"Failed to initialize the wifi mutex");
+	 ESP_LOGE(TAG,"Failed to initialize the wifi mutex");
 	}
 
 	xTaskCreatePinnedToCore(&wifi_app_task, "wifi_app_task", WIFI_APP_TASK_STACK_SIZE, NULL, WIFI_APP_TASK_PRIORITY, NULL, WIFI_APP_TASK_CORE_ID);
