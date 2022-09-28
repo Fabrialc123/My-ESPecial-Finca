@@ -131,7 +131,7 @@ static void wifi_app_task (void *pvParameters){
 
 	wifi_app_send_message(WIFI_APP_MSG_START_HTTP_SERVER);
 
-	ESP_LOGE(TAG,"STACK SIZE: %d",uxTaskGetStackHighWaterMark(NULL));
+	ESP_LOGE(TAG,"STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), WIFI_APP_TASK_STACK_SIZE);
 
 	for(;;){
 		if (xQueueReceive(wifi_app_queue_handle, &msg, portMAX_DELAY)){

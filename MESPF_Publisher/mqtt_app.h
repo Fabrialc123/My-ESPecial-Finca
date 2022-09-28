@@ -11,33 +11,13 @@
 #include "esp_netif.h"
 //#include "mqtt_app.c"
 
-#define MQTT_PORT 1883
-//#define MQTT_URI "mqtt://broker.hivemq.com"
-#define MQTT_URI "mqtt://mqtt.eclipseprojects.io"
+#define MQTT_APP_TIME_TO_SEND_DATA	100 * 30 // 1 second = 100 ticks
+#define MQTT_APP_TOPIC "/TESTFABRI"
 
-#define MQTT_APP_SENSOR_DATA_SIZE 5
-
-//typedef struct{
-//	int waterLevel;
-//	int soilMoisture;
-//	int gas;
-//	int temperature;
-//	int humidity;
-//	/* TODO
-//	 * MORE SENSOR DATA
-//	 */
-//}mqtt_app_data_to_send_t;
-
-typedef struct {
-	char sensorName[10];
-	int sensorData;
-}mqtt_app_sensor_data_t;
-
-mqtt_app_sensor_data_t data_to_send[MQTT_APP_SENSOR_DATA_SIZE];
-
-typedef mqtt_app_sensor_data_t (*mqtt_app_foo_recollecter)(void);
-
-void mqtt_app_register_recollector (mqtt_app_foo_recollecter rtr);
+#define MQTT_APP_PORT 1883
+#define MQTT_APP_URI "mqtt://broker.hivemq.com"
+//#define MQTT_APP_URI "mqtt://mqtt.eclipseprojects.io"
+//#define MQTT_APP_URI "mqtt://iot.eclipse.org"
 
 
 /**

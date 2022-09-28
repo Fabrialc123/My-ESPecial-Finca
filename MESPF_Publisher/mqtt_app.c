@@ -37,18 +37,18 @@
 #include <pthread.h>
 #include "mqtt_app.h"
 #include "task_common.h"
+#include "recollecter.h"
 
 static const char TAG[] = "MQTT_APP";
 
 static QueueHandle_t mqtt_app_queue_handle;
 static esp_mqtt_client_handle_t client;
 
-static pthread_mutex_t mutex_MQTT_APP_RECOLLECTER;
-static mqtt_app_foo_recollecter *recollecters;
-static int recollecters_n;
-
 static int sended_packs;
 static int received_packs;
+
+static pthread_mutex_t mutex_MQTT_APP_MQTT_CONNECTED;
+static int MQTT_CONNECTED;
 
 
 static void log_error_if_nonzero(const char *message, int error_code)
@@ -70,15 +70,19 @@ static void log_error_if_nonzero(const char *message, int error_code)
  */
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
-//	int msg_id;
+	int msg_id;
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
     esp_mqtt_event_handle_t event = event_data;
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
 
-//        msg_id = esp_mqtt_client_subscribe(client, "/TESTFABRI", 0);
-//        ESP_LOGI(TAG, "sent subscribe successful to topic /TESTFABRI , msg_id=%d (FOR TEST ONLY!)", msg_id);
+    	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+    	MQTT_CONNECTED = 1;
+    	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+
+       msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_TOPIC, 0);
+       ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d (FOR TEST ONLY!)",MQTT_APP_TOPIC, msg_id);
 
         break;
     case MQTT_EVENT_DISCONNECTED:
@@ -121,36 +125,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     }
 }
 
-void mqtt_app_register_recollector (mqtt_app_foo_recollecter rtr){
-	pthread_mutex_lock(&mutex_MQTT_APP_RECOLLECTER);
-	recollecters[recollecters_n++] = rtr;
-	pthread_mutex_unlock(&mutex_MQTT_APP_RECOLLECTER);
-}
-
-void mqtt_app_recollect_data (void){
-	int i;
-	pthread_mutex_lock(&mutex_MQTT_APP_RECOLLECTER);
-	for(i = 0; i < recollecters_n;i++){
-		data_to_send[i] = recollecters[i]();
-	}
-	pthread_mutex_unlock(&mutex_MQTT_APP_RECOLLECTER);
-}
 
 void mqtt_app_send_data(void){
-	int msg_id, i;
-	char data[] = "";
-
-	pthread_mutex_lock(&mutex_MQTT_APP_RECOLLECTER);
-	for(i = 0; i < recollecters_n; i++){
-		strcat(data, data_to_send[i].sensorName);
+	int msg_id, i, recollecters ,len;
+	char data[MAX_STRING_LENGTH];
+	recollecters = get_recollecters_size();
+	for (i = 0; i < recollecters;i++){
+		memset(&data, 0, MAX_STRING_LENGTH);
+		len = get_sensor_data (i, &data);
+		if (len < 0 || len >= MAX_STRING_LENGTH){
+			ESP_LOGE(TAG, "ERROR in get_sensor_data(sensor_id = %d)", i);
+			return;
+		}
+		//ESP_LOGI(TAG, "Data to send: %s", data);
+		msg_id = esp_mqtt_client_publish(client, MQTT_APP_TOPIC, data, 0, 1, 0);
+		ESP_LOGI(TAG, "sent publish successful, msg_id=%d, PACKS SENDED: %d", msg_id, ++sended_packs);
 	}
-
-
-	msg_id = esp_mqtt_client_publish(client, "/TESTFABRI", data, 0, 1, 0);
-	ESP_LOGI(TAG, "sent publish successful, msg_id=%d, PACKS SENDED: %d", msg_id, ++sended_packs);
-
-	pthread_mutex_unlock(&mutex_MQTT_APP_RECOLLECTER);
-
 }
 
 static void mqtt_app_task(void *pvParameters)
@@ -162,11 +152,11 @@ static void mqtt_app_task(void *pvParameters)
     };
 */
     esp_mqtt_client_config_t mqtt_cfg = {
-        .uri = MQTT_URI,
-		.port = MQTT_PORT,
+        .uri = MQTT_APP_URI,
+		.port = MQTT_APP_PORT,
     };
 
-    ESP_LOGE(TAG,"STACK SIZE: %d",uxTaskGetStackHighWaterMark(NULL));
+    ESP_LOGE(TAG,"STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_TASK_STACK_SIZE);
 
     //esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     client = esp_mqtt_client_init(&mqtt_cfg);
@@ -180,7 +170,6 @@ static void mqtt_app_task(void *pvParameters)
 				case MQTT_APP_MSG_SEND_DATA:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_SEND_DATA");
 
-					mqtt_app_recollect_data();
 					mqtt_app_send_data();
 
 					break;
@@ -190,6 +179,27 @@ static void mqtt_app_task(void *pvParameters)
 			}
 		}
 	}
+}
+
+static void mqtt_app_data_sender (void *pvParameters){
+	 ESP_LOGE("MQTT_APP_DATA_SENDER","STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_DATA_SENDER_STACK_SIZE);
+	 ESP_LOGI("MQTT_APP_DATA_SENDER", "Sending data every %d seconds.", MQTT_APP_TIME_TO_SEND_DATA/100);
+
+	 for(;;){
+		 ESP_LOGI("MQTT_APP_DATA_SENDER","Sending data...");
+		 mqtt_app_send_message(MQTT_APP_MSG_SEND_DATA);
+		 vTaskDelay(MQTT_APP_TIME_TO_SEND_DATA);
+	 }
+}
+
+int is_mqtt_connected(){
+	int aux;
+
+	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+	aux = MQTT_CONNECTED;
+	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+
+	return aux;
 }
 
 BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID){
@@ -210,17 +220,21 @@ void mqtt_app_start(void)
 //    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
 //    esp_log_level_set("outbox", ESP_LOG_VERBOSE);
 
-	if(pthread_mutex_init (&mutex_MQTT_APP_RECOLLECTER, NULL) != 0){
-	 ESP_LOGE(TAG,"Failed to initialize the recollecter mutex");
-	}
-
 	sended_packs = 0;
 	received_packs = 0;
 
-    recollecters = (mqtt_app_foo_recollecter *)malloc(sizeof(mqtt_app_foo_recollecter) * MQTT_APP_SENSOR_DATA_SIZE);
-    recollecters_n = 0;
+	if(pthread_mutex_init (&mutex_MQTT_APP_MQTT_CONNECTED, NULL) != 0){
+	 ESP_LOGE(TAG,"Failed to initialize the MQTT_CONNECTED mutex");
+	}
+
+	MQTT_CONNECTED = 0;
 
     mqtt_app_queue_handle = xQueueCreate(3, sizeof(mqtt_app_queue_msg_t));
 
     xTaskCreatePinnedToCore(&mqtt_app_task, "mqtt_app_task", MQTT_APP_TASK_STACK_SIZE, NULL, MQTT_APP_TASK_PRIORITY, NULL, MQTT_APP_TASK_CORE_ID);
+
+    while(!is_mqtt_connected());
+
+    xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, NULL, MQTT_APP_DATA_SENDER_CORE_ID);
+
 }

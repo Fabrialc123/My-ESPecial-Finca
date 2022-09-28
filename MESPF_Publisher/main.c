@@ -11,6 +11,7 @@
 #include "http_server.h"
 #include "esp_log.h"
 #include "mqtt_app.h"
+#include "recollecter.h"
 
 #include "tests.c"
 
@@ -37,10 +38,10 @@ void app_main(void)
 
 	mqtt_app_start();
 
+	recollecter_start();
 
 
-
-	mqtt_app_recollect_test();
+	TEST_mqtt_app_recollect();
 
 }
 
