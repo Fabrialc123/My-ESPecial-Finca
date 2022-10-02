@@ -66,24 +66,31 @@ int get_sensor_data (int sensor_id, char *data){
 
 	sensor_data = foo();
 
-	strcat(data, "{");
+	strcat(data, "{\"");
 	strcat(data, sensor_data.sensorName);
-	len += 1 + strlen(sensor_data.sensorName);
+	strcat(data, "\":");
+	len += 4 + strlen(sensor_data.sensorName);
 	for (i = 0; i < sensor_data.valuesLen;i++){
-		strcat(data, ",{");
+		if (i > 0){
+			strcat(data,",");
+			len++;
+		}
+		strcat(data, "{\"");
 		strcat(data, sensor_data.sensor_values[i].valueName);
-		strcat(data,",");
+		strcat(data,"\":");
 		if (sensor_data.sensor_values[i].sensor_value_type == INTEGER){
 			sprintf(aux, "%d",sensor_data.sensor_values[i].sensor_value.ival);
 		}else if (sensor_data.sensor_values[i].sensor_value_type == FLOAT){
 			sprintf(aux, "%f",sensor_data.sensor_values[i].sensor_value.fval);
 		}else {
-			strcpy(aux,sensor_data.sensor_values[i].sensor_value.cval );
+			strcpy(aux, "\"");
+			strcat(aux,sensor_data.sensor_values[i].sensor_value.cval );
+			strcat(aux, "\"");
 		}
 		strcat(data, aux);
 		strcat(data, "}");
 
-		len += 2 + strlen( sensor_data.sensor_values[i].valueName) + 1 + strlen(aux) + 1;
+		len += 3 + strlen( sensor_data.sensor_values[i].valueName) + 1 + strlen(aux) + 1;
 	}
 
 	strcat(data, "}");

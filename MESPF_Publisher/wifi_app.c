@@ -33,8 +33,8 @@ esp_netif_t* esp_netif_ap = NULL;
 
 pthread_mutex_t mutex_WIFI;
 
-int s_retry_num = 0;
-int WIFI_CONNECTED = 0;
+static int s_retry_num = 0;
+static int WIFI_CONNECTED = 0;
 
 /**
  * WiFi application event handler

@@ -9,15 +9,20 @@
 #define MAIN_MQTT_APP_H_
 
 #include "esp_netif.h"
+#include "recollecter.h"
 //#include "mqtt_app.c"
 
 #define MQTT_APP_TIME_TO_SEND_DATA	100 * 30 // 1 second = 100 ticks
-#define MQTT_APP_TOPIC "/TESTFABRI"
+#define MQTT_APP_BROKER_TOPIC "/BROKERTESTFABRI"
+#define MQTT_APP_GENERAL_TOPIC "/TESTFABRI"
 
 #define MQTT_APP_PORT 1883
 #define MQTT_APP_URI "mqtt://broker.hivemq.com"
 //#define MQTT_APP_URI "mqtt://mqtt.eclipseprojects.io"
 //#define MQTT_APP_URI "mqtt://iot.eclipse.org"
+
+#define MQTT_APP_TOPIC_LENGTH	20
+#define MQTT_APP_MAX_CONNECTION_RETRIES 3
 
 
 /**
@@ -26,6 +31,7 @@
  */
 typedef enum{
 	MQTT_APP_MSG_SEND_DATA = 0,
+	MQTT_APP_MSG_SUBSCRIBE
 } mqtt_app_msg_e;
 
 /**
@@ -34,6 +40,7 @@ typedef enum{
  */
 typedef struct{
 	mqtt_app_msg_e	msgID;
+	char	desc[MQTT_APP_TOPIC_LENGTH];
 } mqtt_app_queue_msg_t;
 
 /**
@@ -41,12 +48,13 @@ typedef struct{
  * @param msgID message ID from the mqtt_app_msg_e enum
  * @return pdTRUE if an item was successfully sent to the queue, otherwise pdFALSE
  */
-BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID);
+BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID, char desc[MQTT_APP_TOPIC_LENGTH]);
 
 /**
  * Starts the MQTT application
  */
 void mqtt_app_start(void);
 
+void mqtt_app_refresh_TEST(void);
 
 #endif /* MAIN_MQTT_APP_H_ */

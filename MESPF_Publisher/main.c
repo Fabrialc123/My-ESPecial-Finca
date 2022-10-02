@@ -33,7 +33,6 @@ void app_main(void)
     ESP_LOGI(main_TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
     ESP_LOGI(main_TAG, "[APP] IDF version: %s", esp_get_idf_version());
 
-
 	wifi_app_start();
 
 	mqtt_app_start();
@@ -42,6 +41,7 @@ void app_main(void)
 
 
 	TEST_mqtt_app_recollect();
+	//TEST_mqtt_app_refresh();
 
 }
 

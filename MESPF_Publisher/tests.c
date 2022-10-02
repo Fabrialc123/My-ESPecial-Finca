@@ -29,18 +29,16 @@ sensor_data_t TEST_recollecter (void){
 }
 
 void TEST_mqtt_app_recollect(void){
-	int i;
-	int aux;
-/*	int TEST_SEND_DELAY = 100; // 1 second every 100 ticks +/-*/
-	for (i = 0; i < RECOLLECTER_SIZE;i++){
+	int i, aux;
+
+	for (i = 0; i < 1 ;i++){ // Can be changed to RECOLLECTER_SIZE
 	 aux = register_recollecter(&TEST_recollecter);
 	 ESP_LOGE(TAG, "registered %d recollecter with result = %d", i,aux);
 	}
+}
 
-/*	 while(1){
-		 mqtt_app_send_message(MQTT_APP_MSG_SEND_DATA);
-		 vTaskDelay(TEST_SEND_DELAY);
-	 }*/
+void TEST_mqtt_app_refresh(void){
+	mqtt_app_refresh_TEST();
 }
 
 

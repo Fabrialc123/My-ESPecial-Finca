@@ -48,7 +48,8 @@ static int sended_packs;
 static int received_packs;
 
 static pthread_mutex_t mutex_MQTT_APP_MQTT_CONNECTED;
-static int MQTT_CONNECTED;
+static int MQTT_CONNECTED = 0;
+static int s_retry_num = 0;
 
 
 static void log_error_if_nonzero(const char *message, int error_code)
@@ -56,6 +57,35 @@ static void log_error_if_nonzero(const char *message, int error_code)
     if (error_code != 0) {
         ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
     }
+}
+
+static void mqtt_app_disconnect(void){
+	int status;
+
+	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+	MQTT_CONNECTED = 0;
+	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+
+	status = esp_mqtt_client_disconnect(client);
+	ESP_LOGE(TAG,"Client disconnected (%d)", status);
+	status = esp_mqtt_client_stop(client);
+	ESP_LOGE(TAG,"Client stopped (%d)", status);
+	status = esp_mqtt_client_destroy(client);
+	ESP_LOGE(TAG,"Client destroyed (%d)", status);
+
+	vQueueDelete(mqtt_app_queue_handle);
+
+}
+
+static void mqtt_app_data_sender (void *pvParameters){
+	 ESP_LOGE("MQTT_APP_DATA_SENDER","STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_DATA_SENDER_STACK_SIZE);
+	 ESP_LOGI("MQTT_APP_DATA_SENDER", "Sending data every %d seconds.", MQTT_APP_TIME_TO_SEND_DATA/100);
+	 vTaskDelay(MQTT_APP_TIME_TO_SEND_DATA);
+	 for(;;){
+		 ESP_LOGI("MQTT_APP_DATA_SENDER","Sending data...");
+		 mqtt_app_send_message(MQTT_APP_MSG_SEND_DATA, MQTT_APP_GENERAL_TOPIC);
+		 vTaskDelay(MQTT_APP_TIME_TO_SEND_DATA);
+	 }
 }
 
 /*
@@ -71,6 +101,7 @@ static void log_error_if_nonzero(const char *message, int error_code)
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
 	int msg_id;
+	char desc[MQTT_APP_TOPIC_LENGTH];
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
     esp_mqtt_event_handle_t event = event_data;
     switch ((esp_mqtt_event_id_t)event_id) {
@@ -81,12 +112,28 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     	MQTT_CONNECTED = 1;
     	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
 
-       msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_TOPIC, 0);
-       ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d (FOR TEST ONLY!)",MQTT_APP_TOPIC, msg_id);
+       msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_GENERAL_TOPIC, 0);
+       ESP_LOGE(TAG, "sent subscribe successful to topic %s , msg_id=%d (FOR TEST ONLY!)",MQTT_APP_GENERAL_TOPIC, msg_id);
+
+       msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_BROKER_TOPIC, 0);
+       ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d",MQTT_APP_BROKER_TOPIC, msg_id);
+
+       xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, NULL, MQTT_APP_DATA_SENDER_CORE_ID);
 
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+        if (s_retry_num >= MQTT_APP_MAX_CONNECTION_RETRIES) {
+        	ESP_LOGE(TAG, "Max connection retries, disconnecting and setting down MQTT!");
+        	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+        	MQTT_CONNECTED = -1;
+        	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+
+        }else {
+			ESP_LOGE(TAG, "Retrying reconnect... (%d/%d)", ++s_retry_num, MQTT_APP_MAX_CONNECTION_RETRIES);
+			esp_mqtt_client_reconnect(client);
+        }
+
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -106,7 +153,19 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
         printf("DATA=%.*s\r\n", event->data_len, event->data);
         ESP_LOGI(TAG, "PACKS RECEIVED: %d",++received_packs);
+
+        if(strncmp(event->topic,MQTT_APP_BROKER_TOPIC,event->topic_len) == 0){
+        	ESP_LOGI(TAG,"Received a refresh request from topic %.*s to topic %.*s",event->topic_len,event->topic,event->data_len,event->data);
+        	memset(&desc, 0, MQTT_APP_TOPIC_LENGTH);
+        	strncpy(desc,event->data,event->data_len);
+        	mqtt_app_send_message(MQTT_APP_MSG_SEND_DATA,desc);
+        }
+
         break;
+
+    case MQTT_EVENT_BEFORE_CONNECT:
+    	ESP_LOGI(TAG, "MQTT_EVENT_BEFORE_CONNECT");
+    	break;
 
     case MQTT_EVENT_ERROR:
         ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -116,6 +175,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             log_error_if_nonzero("captured as transport's socket errno",  event->error_handle->esp_transport_sock_errno);
             ESP_LOGI(TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
 
+        }else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED){
+        	ESP_LOGE(TAG,"The broker refused the connection!");
         }
         break;
 
@@ -126,7 +187,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 }
 
 
-void mqtt_app_send_data(void){
+void mqtt_app_send_data(char topic[MQTT_APP_TOPIC_LENGTH]){
 	int msg_id, i, recollecters ,len;
 	char data[MAX_STRING_LENGTH];
 	recollecters = get_recollecters_size();
@@ -138,7 +199,8 @@ void mqtt_app_send_data(void){
 			return;
 		}
 		//ESP_LOGI(TAG, "Data to send: %s", data);
-		msg_id = esp_mqtt_client_publish(client, MQTT_APP_TOPIC, data, 0, 1, 0);
+		ESP_LOGE(TAG, "TESTING DATA SIZE (%d/%d)",strlen(data),len);
+		msg_id = esp_mqtt_client_publish(client, topic, data, 0, 1, 0);
 		ESP_LOGI(TAG, "sent publish successful, msg_id=%d, PACKS SENDED: %d", msg_id, ++sended_packs);
 	}
 }
@@ -168,9 +230,17 @@ static void mqtt_app_task(void *pvParameters)
 		if (xQueueReceive(mqtt_app_queue_handle, &msg, portMAX_DELAY)){
 			switch(msg.msgID){
 				case MQTT_APP_MSG_SEND_DATA:
-					ESP_LOGI(TAG, "MQTT_APP_MSG_SEND_DATA");
+					ESP_LOGI(TAG, "MQTT_APP_MSG_SEND_DATA to topic %s",msg.desc);
 
-					mqtt_app_send_data();
+					mqtt_app_send_data(msg.desc);
+
+					break;
+
+				case MQTT_APP_MSG_SUBSCRIBE:
+					ESP_LOGI(TAG, "MQTT_APP_MSG_SUBSCRIBE to topic %s", msg.desc);
+
+				    esp_mqtt_client_subscribe(client, msg.desc, 0);
+				    ESP_LOGI(TAG, "sent subscribe to topic %s ",msg.desc);
 
 					break;
 
@@ -181,16 +251,6 @@ static void mqtt_app_task(void *pvParameters)
 	}
 }
 
-static void mqtt_app_data_sender (void *pvParameters){
-	 ESP_LOGE("MQTT_APP_DATA_SENDER","STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_DATA_SENDER_STACK_SIZE);
-	 ESP_LOGI("MQTT_APP_DATA_SENDER", "Sending data every %d seconds.", MQTT_APP_TIME_TO_SEND_DATA/100);
-
-	 for(;;){
-		 ESP_LOGI("MQTT_APP_DATA_SENDER","Sending data...");
-		 mqtt_app_send_message(MQTT_APP_MSG_SEND_DATA);
-		 vTaskDelay(MQTT_APP_TIME_TO_SEND_DATA);
-	 }
-}
 
 int is_mqtt_connected(){
 	int aux;
@@ -202,10 +262,11 @@ int is_mqtt_connected(){
 	return aux;
 }
 
-BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID){
+BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID, char desc[CHAR_LENGTH]){
 	mqtt_app_queue_msg_t msg;
 
 	msg.msgID = msgID;
+	strcpy(msg.desc,desc);
 
 	return xQueueSend(mqtt_app_queue_handle, &msg, portMAX_DELAY);
 }
@@ -227,14 +288,27 @@ void mqtt_app_start(void)
 	 ESP_LOGE(TAG,"Failed to initialize the MQTT_CONNECTED mutex");
 	}
 
-	MQTT_CONNECTED = 0;
-
     mqtt_app_queue_handle = xQueueCreate(3, sizeof(mqtt_app_queue_msg_t));
 
     xTaskCreatePinnedToCore(&mqtt_app_task, "mqtt_app_task", MQTT_APP_TASK_STACK_SIZE, NULL, MQTT_APP_TASK_PRIORITY, NULL, MQTT_APP_TASK_CORE_ID);
 
-    while(!is_mqtt_connected());
+    ESP_LOGI(TAG,"Waiting for mqtt broker connection");
+    while(!is_mqtt_connected()){
+    	vTaskDelay(10);
+    }
 
-    xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, NULL, MQTT_APP_DATA_SENDER_CORE_ID);
+    if (is_mqtt_connected() == -1) mqtt_app_disconnect();
 
+}
+
+void mqtt_app_refresh_TEST(void){
+	ESP_LOGE(TAG,"TESTING REFRESH FUNCTION");
+	esp_mqtt_client_subscribe(client,"/REFRESHTESTING", 0);
+	vTaskDelay(500);
+	ESP_LOGE(TAG,"TESTING REFRESH REQUEST");
+	esp_mqtt_client_publish(client, MQTT_APP_BROKER_TOPIC, "/REFRESHTESTING", 0, 1, 0);
+	while(1){
+		vTaskDelay(500);
+		esp_mqtt_client_publish(client, MQTT_APP_BROKER_TOPIC, "/REFRESHTESTING", 0, 1, 0);
+	}
 }
