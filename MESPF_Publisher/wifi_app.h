@@ -10,8 +10,8 @@
 
 #include "esp_netif.h"
 
-#define WIFI_STA_SSID				""
-#define WIFI_STA_PASSWORD			""
+#define WIFI_STA_SSID				"WIFINAME"
+#define WIFI_STA_PASSWORD			"WIFIPASSWORD"
 /*
 #define WIFI_AP_CHANNEL				1				// For more details see the bandwidth of WiFi Channels and the ESP32 documentation
 #define	WIFI_AP_SSID_HIDDEN			0
