@@ -304,11 +304,11 @@ void mqtt_app_start(void)
 void mqtt_app_refresh_TEST(void){
 	ESP_LOGE(TAG,"TESTING REFRESH FUNCTION");
 	esp_mqtt_client_subscribe(client,"/REFRESHTESTING", 0);
-	vTaskDelay(500);
+	vTaskDelay(1500);
 	ESP_LOGE(TAG,"TESTING REFRESH REQUEST");
 	esp_mqtt_client_publish(client, MQTT_APP_BROKER_TOPIC, "/REFRESHTESTING", 0, 1, 0);
 	while(1){
-		vTaskDelay(500);
+		vTaskDelay(1500);
 		esp_mqtt_client_publish(client, MQTT_APP_BROKER_TOPIC, "/REFRESHTESTING", 0, 1, 0);
 	}
 }
