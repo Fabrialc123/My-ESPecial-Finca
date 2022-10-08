@@ -139,100 +139,169 @@ void lcd_init(void){
 
 void lcd_clear(void){
 
-	lcd_send_command(LCD_CLEARDISPLAY);
-	usleep(2000);
+	if(g_i2c_lcd_initialized){
+		lcd_send_command(LCD_CLEARDISPLAY);
+		usleep(2000);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_home(void){
 
-	lcd_send_command(LCD_RETURNHOME);
-	usleep(2000);
+	if(g_i2c_lcd_initialized){
+		lcd_send_command(LCD_RETURNHOME);
+		usleep(2000);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_display_on(void){
 
-	g_display_control |= LCD_DISPLAYON;
-	lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	if(g_i2c_lcd_initialized){
+		g_display_control |= LCD_DISPLAYON;
+		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_display_off(void){
 
-	g_display_control &= ~LCD_DISPLAYON;
-	lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	if(g_i2c_lcd_initialized){
+		g_display_control &= ~LCD_DISPLAYON;
+		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_cursor_on(void){
 
-	g_display_control |= LCD_CURSORON;
-	lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	if(g_i2c_lcd_initialized){
+		g_display_control |= LCD_CURSORON;
+		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_cursor_off(void){
 
-	g_display_control &= ~LCD_CURSORON;
-	lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	if(g_i2c_lcd_initialized){
+		g_display_control &= ~LCD_CURSORON;
+		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_cursor_blink_on(void){
 
-	g_display_control |= LCD_BLINKON;
-	lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	if(g_i2c_lcd_initialized){
+		g_display_control |= LCD_BLINKON;
+		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_cursor_blink_off(void){
 
-	g_display_control &= ~LCD_BLINKON;
-	lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	if(g_i2c_lcd_initialized){
+		g_display_control &= ~LCD_BLINKON;
+		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_left_to_right(void){
 
-	g_display_mode |= LCD_ENTRYLEFT;
-	lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	if(g_i2c_lcd_initialized){
+		g_display_mode |= LCD_ENTRYLEFT;
+		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_right_to_left(void){
 
-	g_display_mode &= ~LCD_ENTRYLEFT;
-	lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	if(g_i2c_lcd_initialized){
+		g_display_mode &= ~LCD_ENTRYLEFT;
+		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_autoscroll_on(void){
 
-	g_display_mode |= LCD_AUTOSCROLLON;
-	lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	if(g_i2c_lcd_initialized){
+		g_display_mode |= LCD_AUTOSCROLLON;
+		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_autoscroll_off(void){
 
-	g_display_mode &= ~LCD_AUTOSCROLLON;
-	lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	if(g_i2c_lcd_initialized){
+		g_display_mode &= ~LCD_AUTOSCROLLON;
+		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_set_cursor(int row, int col){
 
 	uint8_t pos;
 
-	switch (row){
+	if(g_i2c_lcd_initialized){
+		switch (row){
 
-		case 0:
-			pos = 0x80;
-			break;
+			case 0:
+				pos = 0x80;
+				break;
 
-		case 1:
-			pos = 0xC0;
-			break;
+			case 1:
+				pos = 0xC0;
+				break;
 
-		default:
-			pos = 0x80;
-			break;
+			default:
+				pos = 0x80;
+				break;
+		}
+
+		lcd_send_command(pos | col);
 	}
-
-	lcd_send_command(pos | col);
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
 
 void lcd_write(char *str){
 
-	while(*str) lcd_send_data(*str++);
+	if(g_i2c_lcd_initialized){
+		while(*str) lcd_send_data(*str++);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
 }
-
