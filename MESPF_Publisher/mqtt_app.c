@@ -51,6 +51,19 @@ static pthread_mutex_t mutex_MQTT_APP_MQTT_CONNECTED;
 static int MQTT_CONNECTED = 0;
 static int s_retry_num = 0;
 
+static TaskHandle_t MQTT_APP_TASK_HANDLE_TASK;
+static TaskHandle_t MQTT_APP_TASK_HANDLE_DATA_SENDER;
+
+
+int is_mqtt_connected(){
+	int aux;
+
+	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+	aux = MQTT_CONNECTED;
+	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+
+	return aux;
+}
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -62,10 +75,6 @@ static void log_error_if_nonzero(const char *message, int error_code)
 static void mqtt_app_disconnect(void){
 	int status;
 
-	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
-	MQTT_CONNECTED = 0;
-	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
-
 	status = esp_mqtt_client_disconnect(client);
 	ESP_LOGE(TAG,"Client disconnected (%d)", status);
 	status = esp_mqtt_client_stop(client);
@@ -74,6 +83,9 @@ static void mqtt_app_disconnect(void){
 	ESP_LOGE(TAG,"Client destroyed (%d)", status);
 
 	vQueueDelete(mqtt_app_queue_handle);
+
+	vTaskDelete(MQTT_APP_TASK_HANDLE_DATA_SENDER);
+	vTaskDelete(MQTT_APP_TASK_HANDLE_TASK);
 
 }
 
@@ -118,7 +130,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
        msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_BROKER_TOPIC, 0);
        ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d",MQTT_APP_BROKER_TOPIC, msg_id);
 
-       xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, NULL, MQTT_APP_DATA_SENDER_CORE_ID);
+       xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, &MQTT_APP_TASK_HANDLE_DATA_SENDER, MQTT_APP_DATA_SENDER_CORE_ID);
 
         break;
     case MQTT_EVENT_DISCONNECTED:
@@ -128,6 +140,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
         	MQTT_CONNECTED = -1;
         	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+        	mqtt_app_send_message(MQTT_APP_MSG_DISCONNECT, " ");
 
         }else {
 			ESP_LOGE(TAG, "Retrying reconnect... (%d/%d)", ++s_retry_num, MQTT_APP_MAX_CONNECTION_RETRIES);
@@ -244,22 +257,18 @@ static void mqtt_app_task(void *pvParameters)
 
 					break;
 
+				case MQTT_APP_MSG_DISCONNECT:
+					ESP_LOGE(TAG, "MQTT_APP_MSG_DISCONNECT");
+
+					mqtt_app_disconnect();
+
+					break;
+
 				default:
 					break;
 			}
 		}
 	}
-}
-
-
-int is_mqtt_connected(){
-	int aux;
-
-	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
-	aux = MQTT_CONNECTED;
-	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
-
-	return aux;
 }
 
 BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID, char desc[CHAR_LENGTH]){
@@ -290,14 +299,15 @@ void mqtt_app_start(void)
 
     mqtt_app_queue_handle = xQueueCreate(3, sizeof(mqtt_app_queue_msg_t));
 
-    xTaskCreatePinnedToCore(&mqtt_app_task, "mqtt_app_task", MQTT_APP_TASK_STACK_SIZE, NULL, MQTT_APP_TASK_PRIORITY, NULL, MQTT_APP_TASK_CORE_ID);
+//    if(MQTT_APP_TASK_HANDLE_TASK != NULL){
+//    	vTaskDelete(MQTT_APP_TASK_HANDLE_TASK);
+//    }
+    xTaskCreatePinnedToCore(&mqtt_app_task, "mqtt_app_task", MQTT_APP_TASK_STACK_SIZE, NULL, MQTT_APP_TASK_PRIORITY, &MQTT_APP_TASK_HANDLE_TASK, MQTT_APP_TASK_CORE_ID);
 
     ESP_LOGI(TAG,"Waiting for mqtt broker connection");
     while(!is_mqtt_connected()){
     	vTaskDelay(10);
     }
-
-    if (is_mqtt_connected() == -1) mqtt_app_disconnect();
 
 }
 

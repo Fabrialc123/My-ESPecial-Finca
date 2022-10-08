@@ -31,7 +31,8 @@
  */
 typedef enum{
 	MQTT_APP_MSG_SEND_DATA = 0,
-	MQTT_APP_MSG_SUBSCRIBE
+	MQTT_APP_MSG_SUBSCRIBE,
+	MQTT_APP_MSG_DISCONNECT
 } mqtt_app_msg_e;
 
 /**
