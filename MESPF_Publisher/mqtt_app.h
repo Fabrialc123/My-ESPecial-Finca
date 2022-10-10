@@ -12,16 +12,22 @@
 #include "recollecter.h"
 //#include "mqtt_app.c"
 
-#define MQTT_APP_TIME_TO_SEND_DATA	100 * 30 // 1 second = 100 ticks
-#define MQTT_APP_BROKER_TOPIC "/BROKERTESTFABRI"
-#define MQTT_APP_GENERAL_TOPIC "/TESTFABRI"
+#define MQTT_APP_TIME_TO_SEND_DATA			100 * 30 // 1 second = 100 ticks
+#define MQTT_APP_COMMANDS_TOPIC 			"COMMANDTESTFABRI"
+#define MQTT_APP_REFRESH_TOPIC				"COMMANDTESTFABRI/REFRESH"
+#define MQTT_APP_SCAN_TOPIC					"COMMANDTESTFABRI/SCAN"
+#define MQTT_APP_SCAN_RESP_TOPIC			"/SCANRESP"
+#define MQTT_APP_GENERAL_TOPIC 				"TESTFABRI"
+//#define MQTT_APP_PERSONAL_TOPIC				"ESP32_%CHIPID%"
+#define MQTT_APP_QOS						0
 
-#define MQTT_APP_PORT 1883
-#define MQTT_APP_URI "mqtt://broker.hivemq.com"
-//#define MQTT_APP_URI "mqtt://mqtt.eclipseprojects.io"
-//#define MQTT_APP_URI "mqtt://iot.eclipse.org"
+#define MQTT_APP_PORT 						1883
+#define MQTT_APP_HOST 						"192.168.68.78"
+//#define MQTT_APP_URI 						"mqtt://broker.hivemq.com"
+//#define MQTT_APP_URI 						"mqtt://mqtt.eclipseprojects.io"
+//#define MQTT_APP_URI 						"mqtt://iot.eclipse.org"
 
-#define MQTT_APP_TOPIC_LENGTH	20
+#define MQTT_APP_TOPIC_LENGTH	128
 #define MQTT_APP_MAX_CONNECTION_RETRIES 3
 
 
@@ -32,6 +38,7 @@
 typedef enum{
 	MQTT_APP_MSG_SEND_DATA = 0,
 	MQTT_APP_MSG_SUBSCRIBE,
+	MQTT_APP_MSG_SCAN_RESPONSE,
 	MQTT_APP_MSG_DISCONNECT
 } mqtt_app_msg_e;
 

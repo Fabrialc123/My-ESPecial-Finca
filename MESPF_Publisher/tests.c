@@ -32,7 +32,7 @@ sensor_data_t TEST_recollecter (void){
 
 	aux.sensor_values[2].sensor_value_type = STRING;
 	strcpy(aux.sensor_values[2].valueName,"STRINGTEST");
-	strcpy(aux.sensor_values[2].sensor_value.cval , "333.3");
+	strcpy(aux.sensor_values[2].sensor_value.cval , "CHAR");
 
 	return aux;
 }

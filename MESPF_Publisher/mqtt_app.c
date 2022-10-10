@@ -41,6 +41,9 @@
 
 static const char TAG[] = "MQTT_APP";
 
+static char *MQTT_APP_PERSONAL_TOPIC;
+static char *MQTT_APP_PERSONAL_NAME;
+
 static QueueHandle_t mqtt_app_queue_handle;
 static esp_mqtt_client_handle_t client;
 
@@ -53,6 +56,45 @@ static int s_retry_num = 0;
 
 static TaskHandle_t MQTT_APP_TASK_HANDLE_TASK;
 static TaskHandle_t MQTT_APP_TASK_HANDLE_DATA_SENDER;
+
+
+// FUNCTION COPIED FROM platform_create_id_string() (platform_esp32_idf.c)
+static void set_personal_topic_name(void){
+	//char aux[32];
+    uint8_t mac[6];
+    MQTT_APP_PERSONAL_TOPIC = calloc(1, MQTT_APP_TOPIC_LENGTH);
+    MQTT_APP_PERSONAL_NAME = calloc(1, MQTT_APP_TOPIC_LENGTH);
+    strcpy(MQTT_APP_PERSONAL_TOPIC,MQTT_APP_GENERAL_TOPIC);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    sprintf(MQTT_APP_PERSONAL_NAME, "ESP32_%02x%02X%02X", mac[3], mac[4], mac[5]);
+
+    strcat(MQTT_APP_PERSONAL_TOPIC, "/");
+    strcat(MQTT_APP_PERSONAL_TOPIC, MQTT_APP_PERSONAL_NAME);
+
+}
+
+static void mqtt_app_scan_response(char* topic){
+	char aux[MQTT_APP_TOPIC_LENGTH];
+	memset(&aux,0,MQTT_APP_TOPIC_LENGTH);
+	strcpy(aux,topic);
+	strcat(aux,MQTT_APP_SCAN_RESP_TOPIC);
+	esp_mqtt_client_publish(client, aux, MQTT_APP_PERSONAL_NAME, 0, MQTT_APP_QOS, 0);
+}
+
+static void get_sensor_name(char* dest, char* data){
+	int len,i;
+	char aux;
+
+	len = 0;
+	i = 3;
+	aux = data[2];
+	while(aux != '"'){
+		len++;
+		aux = data[i++];
+	}
+	strncat(dest,data + 2,len);
+
+}
 
 
 int is_mqtt_connected(){
@@ -84,6 +126,9 @@ static void mqtt_app_disconnect(void){
 
 	vQueueDelete(mqtt_app_queue_handle);
 
+	free(MQTT_APP_PERSONAL_TOPIC);
+	free(MQTT_APP_PERSONAL_NAME);
+
 	vTaskDelete(MQTT_APP_TASK_HANDLE_DATA_SENDER);
 	vTaskDelete(MQTT_APP_TASK_HANDLE_TASK);
 
@@ -113,6 +158,7 @@ static void mqtt_app_data_sender (void *pvParameters){
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
 	int msg_id;
+	char aux[MQTT_APP_TOPIC_LENGTH];
 	char desc[MQTT_APP_TOPIC_LENGTH];
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
     esp_mqtt_event_handle_t event = event_data;
@@ -124,11 +170,18 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     	MQTT_CONNECTED = 1;
     	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
 
-       msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_GENERAL_TOPIC, 0);
-       ESP_LOGE(TAG, "sent subscribe successful to topic %s , msg_id=%d (FOR TEST ONLY!)",MQTT_APP_GENERAL_TOPIC, msg_id);
 
-       msg_id = esp_mqtt_client_subscribe(client, MQTT_APP_BROKER_TOPIC, 0);
-       ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d",MQTT_APP_BROKER_TOPIC, msg_id);
+    	memset(&aux,0,MQTT_APP_TOPIC_LENGTH);
+    	strcpy(aux,MQTT_APP_PERSONAL_TOPIC);
+    	strcat(aux,"/#");		// Subscribes to all subtopics
+       msg_id = esp_mqtt_client_subscribe(client, aux,MQTT_APP_QOS);
+       ESP_LOGE(TAG, "sent subscribe successful to topic %s , msg_id=%d (FOR TEST ONLY!)",aux, msg_id);
+
+		memset(&aux,0,MQTT_APP_TOPIC_LENGTH);
+		strcpy(aux,MQTT_APP_COMMANDS_TOPIC);
+		strcat(aux,"/#");		// Subscribes to all subtopics
+       msg_id = esp_mqtt_client_subscribe(client, aux, MQTT_APP_QOS);
+       ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d",aux, msg_id);
 
        xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, &MQTT_APP_TASK_HANDLE_DATA_SENDER, MQTT_APP_DATA_SENDER_CORE_ID);
 
@@ -167,11 +220,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         printf("DATA=%.*s\r\n", event->data_len, event->data);
         ESP_LOGI(TAG, "PACKS RECEIVED: %d",++received_packs);
 
-        if(strncmp(event->topic,MQTT_APP_BROKER_TOPIC,event->topic_len) == 0){
+        if(strncmp(event->topic,MQTT_APP_REFRESH_TOPIC,event->topic_len) == 0){
         	ESP_LOGI(TAG,"Received a refresh request from topic %.*s to topic %.*s",event->topic_len,event->topic,event->data_len,event->data);
         	memset(&desc, 0, MQTT_APP_TOPIC_LENGTH);
         	strncpy(desc,event->data,event->data_len);
         	mqtt_app_send_message(MQTT_APP_MSG_SEND_DATA,desc);
+        }else if(strncmp(event->topic,MQTT_APP_SCAN_TOPIC,event->topic_len) == 0){
+        	ESP_LOGI(TAG,"Received a scan request from topic %.*s to topic %.*s",event->topic_len,event->topic,event->data_len,event->data);
+        	memset(&desc, 0, MQTT_APP_TOPIC_LENGTH);
+        	strncpy(desc,event->data,event->data_len);
+        	mqtt_app_send_message(MQTT_APP_MSG_SCAN_RESPONSE,desc);
         }
 
         break;
@@ -203,23 +261,29 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 void mqtt_app_send_data(char topic[MQTT_APP_TOPIC_LENGTH]){
 	int msg_id, i, recollecters ,len;
 	char data[MAX_STRING_LENGTH];
+	char sensor_topic[MQTT_APP_TOPIC_LENGTH];
+
 	recollecters = get_recollecters_size();
 	for (i = 0; i < recollecters;i++){
+		memset(&sensor_topic, 0, MQTT_APP_TOPIC_LENGTH);
 		memset(&data, 0, MAX_STRING_LENGTH);
 		len = get_sensor_data (i, &data);
 		if (len < 0 || len >= MAX_STRING_LENGTH){
 			ESP_LOGE(TAG, "ERROR in get_sensor_data(sensor_id = %d)", i);
 			return;
 		}
-		//ESP_LOGI(TAG, "Data to send: %s", data);
 		ESP_LOGE(TAG, "TESTING DATA SIZE (%d/%d)",strlen(data),len);
-		msg_id = esp_mqtt_client_publish(client, topic, data, 0, 1, 0);
+		strcpy(sensor_topic, topic);
+		strcat(sensor_topic, "/");
+		strcat(sensor_topic,MQTT_APP_PERSONAL_NAME);
+		strcat(sensor_topic, "/");
+		get_sensor_name(sensor_topic,data);
+		msg_id = esp_mqtt_client_publish(client, sensor_topic, data, 0, MQTT_APP_QOS, 0);
 		ESP_LOGI(TAG, "sent publish successful, msg_id=%d, PACKS SENDED: %d", msg_id, ++sended_packs);
 	}
 }
 
-static void mqtt_app_task(void *pvParameters)
-{
+static void mqtt_app_task(void *pvParameters){
 	mqtt_app_queue_msg_t msg;
 	/*
     esp_mqtt_client_config_t mqtt_cfg = {
@@ -227,7 +291,11 @@ static void mqtt_app_task(void *pvParameters)
     };
 */
     esp_mqtt_client_config_t mqtt_cfg = {
+#ifdef MQTT_APP_HOST
+    	.host = MQTT_APP_HOST,
+#else
         .uri = MQTT_APP_URI,
+#endif
 		.port = MQTT_APP_PORT,
     };
 
@@ -252,9 +320,14 @@ static void mqtt_app_task(void *pvParameters)
 				case MQTT_APP_MSG_SUBSCRIBE:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_SUBSCRIBE to topic %s", msg.desc);
 
-				    esp_mqtt_client_subscribe(client, msg.desc, 0);
+				    esp_mqtt_client_subscribe(client, msg.desc, MQTT_APP_QOS);
 				    ESP_LOGI(TAG, "sent subscribe to topic %s ",msg.desc);
 
+					break;
+
+				case MQTT_APP_MSG_SCAN_RESPONSE:
+					ESP_LOGI(TAG, "MQTT_APP_MSG_SCAN_RESPONSE to topic %s", msg.desc);
+					mqtt_app_scan_response(msg.desc);
 					break;
 
 				case MQTT_APP_MSG_DISCONNECT:
@@ -297,11 +370,10 @@ void mqtt_app_start(void)
 	 ESP_LOGE(TAG,"Failed to initialize the MQTT_CONNECTED mutex");
 	}
 
+	set_personal_topic_name();
+
     mqtt_app_queue_handle = xQueueCreate(3, sizeof(mqtt_app_queue_msg_t));
 
-//    if(MQTT_APP_TASK_HANDLE_TASK != NULL){
-//    	vTaskDelete(MQTT_APP_TASK_HANDLE_TASK);
-//    }
     xTaskCreatePinnedToCore(&mqtt_app_task, "mqtt_app_task", MQTT_APP_TASK_STACK_SIZE, NULL, MQTT_APP_TASK_PRIORITY, &MQTT_APP_TASK_HANDLE_TASK, MQTT_APP_TASK_CORE_ID);
 
     ESP_LOGI(TAG,"Waiting for mqtt broker connection");
@@ -313,12 +385,12 @@ void mqtt_app_start(void)
 
 void mqtt_app_refresh_TEST(void){
 	ESP_LOGE(TAG,"TESTING REFRESH FUNCTION");
-	esp_mqtt_client_subscribe(client,"/REFRESHTESTING", 0);
+	esp_mqtt_client_subscribe(client,"REFRESHTESTING/#", MQTT_APP_QOS);
 	vTaskDelay(1500);
 	ESP_LOGE(TAG,"TESTING REFRESH REQUEST");
-	esp_mqtt_client_publish(client, MQTT_APP_BROKER_TOPIC, "/REFRESHTESTING", 0, 1, 0);
+	esp_mqtt_client_publish(client, MQTT_APP_SCAN_TOPIC, "REFRESHTESTING", 0, MQTT_APP_QOS, 0);
 	while(1){
 		vTaskDelay(1500);
-		esp_mqtt_client_publish(client, MQTT_APP_BROKER_TOPIC, "/REFRESHTESTING", 0, 1, 0);
+		esp_mqtt_client_publish(client, MQTT_APP_SCAN_TOPIC, "REFRESHTESTING", 0, MQTT_APP_QOS, 0);
 	}
 }
