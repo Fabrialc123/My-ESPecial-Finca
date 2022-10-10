@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".AddEspActivity">
+
+    <com.mikhaellopez.circularimageview.CircularImageView
+        android:id="@+id/iv_estado_conexion_add"
+        android:layout_width="40dp"
+        android:src="@drawable/conexion_inexistente_imagen"
+        android:layout_height="30dp"
+        app:civ_border_width="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <EditText
+        android:id="@+id/tv_esp_nombre"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:hint="Nombre"
+        android:textColorHint="@color/gris"
+        android:textSize="35dp"
+        app:layout_constraintTop_toTopOf="parent"
+        android:textColor="@android:color/black"
+        app:layout_constraintStart_toEndOf="@+id/iv_estado_conexion_add"/>
+
+
+
+    <Switch
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/temperatura_si_no"
+        android:textSize="20dp"
+        android:text="¿Sensor de Temperatura?"
+        android:layout_marginTop="10dp"
+        app:layout_constraintTop_toBottomOf="@+id/tv_esp_nombre"
+        app:layout_constraintStart_toEndOf="@+id/iv_estado_conexion_add"
+        ></Switch>
+
+    <Switch
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/humedad_si_no"
+        android:text="¿Sensor de humedad?"
+        android:textSize="20dp"
+        android:layout_marginTop="10dp"
+        app:layout_constraintTop_toBottomOf="@+id/temperatura_si_no"
+        app:layout_constraintStart_toEndOf="@+id/iv_estado_conexion_add"
+        ></Switch>
+
+    <Switch
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/agua_si_no"
+        android:text="¿Sensor de agua?"
+        android:textSize="20dp"
+        android:layout_marginTop="10dp"
+        app:layout_constraintTop_toBottomOf="@+id/humedad_si_no"
+        app:layout_constraintStart_toEndOf="@+id/iv_estado_conexion_add"
+        ></Switch>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/bt_add_esp"
+        android:text="Añadir"
+        android:layout_marginTop="20dp"
+        app:layout_constraintTop_toBottomOf="@id/agua_si_no"
+        app:layout_constraintStart_toEndOf="@+id/agua_si_no"
+        android:layout_marginLeft="20dp"></Button>
+
+
+
+
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
