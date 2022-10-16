@@ -97,7 +97,6 @@ int get_sensor_data (int sensor_id, char *data){
 	strcat(data, "}");
 	len += 2;
 
-	free(sensor_data.sensor_values);
 	return len;
 }
 
