@@ -6,6 +6,7 @@ idf_component_register(SRCS main.c wifi_app.c http_server.c
 							gpios/led_rgb.c
 							gpios/lcd.c
 							gpios/mq2.c
+							gpios/dht22.c
 						INCLUDE_DIRS "."
 						EMBED_FILES webpage/app.css 
 						webpage/app.js  
