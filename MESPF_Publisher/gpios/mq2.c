@@ -31,7 +31,7 @@ void mq2_init(void){
 
 	sensor_data.sensor_values = (sensor_value_t *)malloc(sizeof(sensor_value_t) * number_of_values);
 
-	strcpy(sensor_data.sensor_values[0].valueName, "Smoke/Gas");
+	strcpy(sensor_data.sensor_values[0].valueName, "S/G");
 	sensor_data.sensor_values[0].sensor_value_type = INTEGER;
 
 	g_mq2_initialized = true;
