@@ -8,10 +8,12 @@
 #include "gpios/lcd.h"
 
 #include <stdbool.h>
+#include <pthread.h>
 
 #include "unistd.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "string.h"
 
 static const char TAG[] = "lcd";
 
@@ -21,6 +23,11 @@ static uint8_t g_display_mode 		= 0x00;
 static uint8_t g_display_control 	= 0x00;
 static uint8_t g_display_function 	= 0x00;
 
+static pthread_mutex_t mutex_lcd;
+static sensor_data_t *sensors;
+static int sensors_n;
+
+static int current_sensor;
 
 /**
  * Initializes the I2C LCD controller
@@ -92,7 +99,19 @@ void lcd_init(void){
 	if(!g_i2c_lcd_initialized){
 
 		if(i2c_lcd_init() == 0){
-			g_i2c_lcd_initialized = true;
+
+			if(pthread_mutex_init (&mutex_lcd, NULL) != 0){
+				ESP_LOGE(TAG,"Failed to initialize the LCD mutex");
+			}
+			else{
+				sensors = (sensor_data_t *)malloc(sizeof(sensor_data_t) * LCD_SENSOR_SIZE);
+				sensors_n = 0;
+
+				current_sensor = 0;
+
+				g_i2c_lcd_initialized = true;
+			}
+
 		}
 		else{
 			ESP_LOGE(TAG, "Error with the I2C-LCD initialization");
@@ -247,22 +266,20 @@ void lcd_right_to_left(void){
 	}
 }
 
-void lcd_autoscroll_on(void){
+void lcd_shift_display_left(void){
 
 	if(g_i2c_lcd_initialized){
-		g_display_mode |= LCD_AUTOSCROLLON;
-		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+		lcd_send_command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVELEFT);
 	}
 	else{
 		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
 	}
 }
 
-void lcd_autoscroll_off(void){
+void lcd_shift_display_right(void){
 
 	if(g_i2c_lcd_initialized){
-		g_display_mode &= ~LCD_AUTOSCROLLON;
-		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+		lcd_send_command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVERIGHT);
 	}
 	else{
 		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
@@ -300,6 +317,163 @@ void lcd_write(char *str){
 
 	if(g_i2c_lcd_initialized){
 		while(*str) lcd_send_data(*str++);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
+}
+
+void lcd_one_more_sensor(void){
+
+	if(g_i2c_lcd_initialized){
+		pthread_mutex_lock(&mutex_lcd);
+
+			if(sensors_n >= LCD_SENSOR_SIZE){
+				ESP_LOGE(TAG, "ERROR, you can't manage more than %d sensors with the LCD", LCD_SENSOR_SIZE);
+			}
+			else{
+				sensors_n++;
+			}
+
+		pthread_mutex_unlock(&mutex_lcd);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
+}
+
+void lcd_one_less_sensor(int sensor_id){
+
+	if(g_i2c_lcd_initialized){
+		pthread_mutex_lock(&mutex_lcd);
+
+		if((sensor_id >= sensors_n) || (sensor_id < 0)){
+			ESP_LOGE(TAG, "ERROR, you can't delete a non-existant sensor");
+		}
+		else{
+			for(int i = sensor_id; i < sensors_n - 1; i++){
+				sensors[i] = sensors[i + 1];
+			}
+
+			memset(&sensors[sensors_n - 1], 0, sizeof(sensor_data_t));
+			sensors_n--;
+		}
+
+		pthread_mutex_unlock(&mutex_lcd);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
+}
+
+void lcd_update_sensor_data(int sensor_id, sensor_data_t sensor_data){
+
+	if(g_i2c_lcd_initialized){
+		pthread_mutex_lock(&mutex_lcd);
+
+		if((sensor_id >= sensors_n) || (sensor_id < 0)){
+			ESP_LOGE(TAG, "ERROR, you can't update a non-existant sensor");
+		}
+		else{
+			sensors[sensor_id] = sensor_data;
+		}
+
+		pthread_mutex_unlock(&mutex_lcd);
+	}
+	else{
+		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
+	}
+}
+
+void lcd_show_next_sensor_data(void){
+
+	sensor_data_t sensor_data;
+
+	if(g_i2c_lcd_initialized){
+
+		pthread_mutex_lock(&mutex_lcd);
+
+		sensor_data = sensors[current_sensor];
+
+		pthread_mutex_unlock(&mutex_lcd);
+
+		lcd_clear();
+
+		// First row (Sensor ID + Sensor Name)
+
+		char fr[MAX_CHARAC_ROW];
+		char auxfr[10];
+
+		memset(&fr, 0, MAX_CHARAC_ROW);
+		memset(&auxfr, 0, 10);
+
+		strcat(fr, "[Sensor id: ");
+
+		sprintf(auxfr, "%d", current_sensor);
+
+		strcat(fr, auxfr);
+		strcat(fr, "] [Name: ");
+		strncat(fr, sensor_data.sensorName, 15);
+		strcat(fr, "]");
+
+		lcd_set_cursor(0, 0);
+		lcd_write(fr);
+
+		// Second row (Sensor Values)
+
+		char sr[MAX_CHARAC_ROW];
+		char auxsr[10];
+
+		memset(&sr, 0, MAX_CHARAC_ROW);
+		memset(&auxsr, 0, 10);
+
+		for(int i = 0; i < sensor_data.valuesLen; i++){
+
+			strcat(sr, "[");
+
+			if(sensor_data.sensor_values[i].sensor_value_type == INTEGER){
+				strncat(sr, sensor_data.sensor_values[i].valueName, 5);
+				strcat(sr, ": ");
+
+				sprintf(auxsr, "%d", sensor_data.sensor_values[i].sensor_value.ival);
+
+				strcat(sr, auxsr);
+			}
+			else if(sensor_data.sensor_values[i].sensor_value_type == FLOAT){
+				strncat(sr, sensor_data.sensor_values[i].valueName, 5);
+				strcat(sr, ": ");
+
+				sprintf(auxsr, "%f", sensor_data.sensor_values[i].sensor_value.fval);
+
+				strcat(sr, auxsr);
+			}
+			else{
+				strncat(sr, sensor_data.sensor_values[i].valueName, 5);
+				strcat(sr, ": ");
+				strncat(sr, sensor_data.sensor_values[i].sensor_value.cval, 10);
+			}
+
+			if(i < sensor_data.valuesLen - 1){
+				strcat(sr, "] ");
+			}
+			else{
+				strcat(sr, "]");
+			}
+		}
+
+		lcd_set_cursor(1, 0);
+		lcd_write(sr);
+
+		pthread_mutex_lock(&mutex_lcd);
+
+		if(current_sensor < sensors_n - 1){
+			current_sensor++;
+		}
+		else{
+			current_sensor = 0;
+		}
+
+		pthread_mutex_unlock(&mutex_lcd);
 	}
 	else{
 		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
