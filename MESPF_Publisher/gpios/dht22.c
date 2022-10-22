@@ -52,10 +52,10 @@ void dht22_init(void){
 
 	sensor_data.sensor_values = (sensor_value_t *)malloc(sizeof(sensor_value_t) * number_of_values);
 
-	strcpy(sensor_data.sensor_values[0].valueName, "Humidity");
+	strcpy(sensor_data.sensor_values[0].valueName, "Hum");
 	sensor_data.sensor_values[0].sensor_value_type = FLOAT;
 
-	strcpy(sensor_data.sensor_values[1].valueName, "Temperature");
+	strcpy(sensor_data.sensor_values[1].valueName, "Temp");
 	sensor_data.sensor_values[1].sensor_value_type = FLOAT;
 
 	g_dht22_initialized = true;
@@ -94,13 +94,13 @@ sensor_data_t dht22_get_sensor_data(void){
 		gpio_set_direction(DHT22_GPIO, GPIO_MODE_INPUT);	// change to input mode
 
 		// DHT will keep the line low for 80 us and then high for 80 us
-		uSec = dht22_get_signal_level(85, 0);
+		uSec = dht22_get_signal_level(82, 0);
 	//	ESP_LOGI( TAG, "Response = %d", uSec );
 		if(uSec < 0){
 			return sensor_data;
 		}
 
-		uSec = dht22_get_signal_level(85, 1);
+		uSec = dht22_get_signal_level(82, 1);
 	//	ESP_LOGI( TAG, "Response = %d", uSec );
 		if(uSec < 0){
 			return sensor_data;
@@ -110,13 +110,13 @@ sensor_data_t dht22_get_sensor_data(void){
 		for(int k = 0; k < 40; k++){
 
 			// Starts new data transmission with >50us low signal
-			uSec = dht22_get_signal_level(56, 0);
+			uSec = dht22_get_signal_level(52, 0);
 			if(uSec < 0){
 				return sensor_data;
 			}
 
 			// Check to see if after >70us RX data is a 0 or a 1
-			uSec = dht22_get_signal_level(75, 1);
+			uSec = dht22_get_signal_level(72, 1);
 			if(uSec < 0){
 				return sensor_data;
 			}
