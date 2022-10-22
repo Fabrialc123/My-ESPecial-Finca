@@ -9,6 +9,7 @@
 #include "string.h"
 
 #include "recollecter.h"
+#include "gpios/lcd.h"
 #include <pthread.h>
 
 static pthread_mutex_t mutex_RECOLLECTER;
@@ -97,6 +98,8 @@ int get_sensor_data (int sensor_id, char *data){
 	strcat(data, "}");
 	len += 2;
 
+	lcd_update_sensor_data(sensor_id, sensor_data);
+
 	return len;
 }
 
@@ -110,7 +113,3 @@ void recollecter_start(void){
 
     ESP_LOGI(TAG, "recollecter started");
 }
-
-
-
-
