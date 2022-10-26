@@ -45,7 +45,9 @@ int register_recollecter (recollecter_function rtr);
 
 int get_recollecters_size (void);
 
-int get_sensor_data (int sensor_id, char *data);
+int get_sensor_data_json (int sensor_id, char *data);
+
+sensor_data_t get_sensor_data (int sensor_id);
 
 void recollecter_start(void);
 
