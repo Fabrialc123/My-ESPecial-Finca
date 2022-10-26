@@ -4,62 +4,37 @@
  *  Created on: 26 sept. 2022
  *      Author: fabri
  */
+#include <mqtt/mqtt_app.h>
 #include "esp_log.h"
 
-#include "mqtt_app.h"
 #include "recollecter.h"
 #include <string.h>
 
 static const char TAG[] = "TEST";
 
-static sensor_data_t sensor_data;
-
 sensor_data_t TEST_recollecter (void){
-
-	/**
-	 *
-	 * Here you update peripherals data
-	 *
-	 * IMPORTANT!!! Here i'm not doing it but first of all check that you have initialized the sensor (e.g with a global boolean variable)
-	 *
-	 */
-
-	//First peripheral
-	sensor_data.sensor_values[0].sensor_value.ival = 1111;
-
-	//Second peripheral
-	sensor_data.sensor_values[1].sensor_value.fval = 22.22;
-
-	//Third peripheral
-	strcpy(sensor_data.sensor_values[2].sensor_value.cval , "333.3");
-
-	return sensor_data;
-}
-
-void TEST_init(void){
-
+	sensor_data_t aux;
+	sensor_value_t *aux2;
 	int number_of_values = 3;
 
-	//Sensor name
-	strcpy(sensor_data.sensorName, "TESTING");
+	aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * number_of_values);
 
-	//Sensor values length
-	sensor_data.valuesLen = number_of_values;
+	strcpy(aux.sensorName, "TESTING");
+	aux.valuesLen = number_of_values;
+	aux.sensor_values = aux2;
+	aux.sensor_values[0].sensor_value_type = INTEGER;
+	strcpy(aux.sensor_values[0].valueName,"INTEGERTEST");
+	aux.sensor_values[0].sensor_value.ival = 1111;
 
-	//Sensor peripherals
-	sensor_data.sensor_values = (sensor_value_t *)malloc(sizeof(sensor_value_t) * number_of_values);
+	aux.sensor_values[1].sensor_value_type = FLOAT;
+	strcpy(aux.sensor_values[1].valueName,"FLOATTEST");
+	aux.sensor_values[1].sensor_value.fval = 22.22;
 
-	//First peripheral
-	strcpy(sensor_data.sensor_values[0].valueName,"INTEGERTEST");
-	sensor_data.sensor_values[0].sensor_value_type = INTEGER;
+	aux.sensor_values[2].sensor_value_type = STRING;
+	strcpy(aux.sensor_values[2].valueName,"STRINGTEST");
+	strcpy(aux.sensor_values[2].sensor_value.cval , "CHAR");
 
-	//Second peripheral
-	strcpy(sensor_data.sensor_values[1].valueName,"FLOATTEST");
-	sensor_data.sensor_values[1].sensor_value_type = FLOAT;
-
-	//Third peripheral
-	strcpy(sensor_data.sensor_values[2].valueName,"STRINGTEST");
-	sensor_data.sensor_values[2].sensor_value_type = STRING;
+	return aux;
 }
 
 void TEST_mqtt_app_recollect(void){
@@ -74,3 +49,7 @@ void TEST_mqtt_app_recollect(void){
 void TEST_mqtt_app_refresh(void){
 	mqtt_app_refresh_TEST();
 }
+
+
+
+

@@ -9,7 +9,6 @@
 #include "string.h"
 
 #include "recollecter.h"
-#include "gpios/lcd.h"
 #include <pthread.h>
 
 static pthread_mutex_t mutex_RECOLLECTER;
@@ -46,26 +45,15 @@ pthread_mutex_unlock(&mutex_RECOLLECTER);
 	return size;
 }
 
-int get_sensor_data (int sensor_id, char *data){
+int get_sensor_data_json (int sensor_id, char *data){
 	char aux[CHAR_LENGTH];
-	recollecter_function foo;
 	sensor_data_t sensor_data;
 	int i;
 	int len = 0;
 
+	sensor_data = get_sensor_data(sensor_id);
 
-	pthread_mutex_lock(&mutex_RECOLLECTER);
-		if (sensor_id >= recollecters_n){
-			len = -1;
-			ESP_LOGE(TAG, "ERROR in get_sensor_data, the sensor_id is out of range!");
-		}else {
-			foo = recollecters[sensor_id];
-		}
-	pthread_mutex_unlock(&mutex_RECOLLECTER);
-
-	if (len == -1) return -1;
-
-	sensor_data = foo();
+	if (sensor_data == NULL) return -1;
 
 	strcat(data, "{\"");
 	strcat(data, sensor_data.sensorName);
@@ -98,9 +86,25 @@ int get_sensor_data (int sensor_id, char *data){
 	strcat(data, "}");
 	len += 2;
 
-	lcd_update_sensor_data(sensor_id, sensor_data);
-
+	free(sensor_data.sensor_values);
 	return len;
+}
+
+sensor_data_t get_sensor_data (int sensor_id){
+	recollecter_function foo;
+	sensor_data_t sensor_data;
+	int i;
+
+	pthread_mutex_lock(&mutex_RECOLLECTER);
+		if (sensor_id >= recollecters_n || sensor_id < 0){
+			ESP_LOGE(TAG, "ERROR in get_sensor_data, the sensor_id is out of range!");
+			return NULL;
+		}else {
+			foo = recollecters[sensor_id];
+		}
+	pthread_mutex_unlock(&mutex_RECOLLECTER);
+
+	return foo();
 }
 
 void recollecter_start(void){
@@ -113,3 +117,7 @@ void recollecter_start(void){
 
     ESP_LOGI(TAG, "recollecter started");
 }
+
+
+
+
