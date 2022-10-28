@@ -53,7 +53,7 @@ int get_sensor_data_json (int sensor_id, char *data){
 
 	sensor_data = get_sensor_data(sensor_id);
 
-	if (sensor_data == NULL) return -1;
+	if (sensor_data.valuesLen == 0) return -1;
 
 	strcat(data, "{\"");
 	strcat(data, sensor_data.sensorName);
@@ -93,18 +93,21 @@ int get_sensor_data_json (int sensor_id, char *data){
 sensor_data_t get_sensor_data (int sensor_id){
 	recollecter_function foo;
 	sensor_data_t sensor_data;
-	int i;
+
+	sensor_data.valuesLen = 0;
 
 	pthread_mutex_lock(&mutex_RECOLLECTER);
 		if (sensor_id >= recollecters_n || sensor_id < 0){
 			ESP_LOGE(TAG, "ERROR in get_sensor_data, the sensor_id is out of range!");
-			return NULL;
+			return sensor_data;
 		}else {
 			foo = recollecters[sensor_id];
 		}
 	pthread_mutex_unlock(&mutex_RECOLLECTER);
 
-	return foo();
+	sensor_data = foo();
+
+	return sensor_data;
 }
 
 void recollecter_start(void){
@@ -117,7 +120,3 @@ void recollecter_start(void){
 
     ESP_LOGI(TAG, "recollecter started");
 }
-
-
-
-
