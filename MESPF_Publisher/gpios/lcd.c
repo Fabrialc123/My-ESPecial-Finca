@@ -6,9 +6,10 @@
  */
 
 #include "gpios/lcd.h"
+#include "recollecter.h"
+#include "task_common.h"
 
 #include <stdbool.h>
-#include <pthread.h>
 
 #include "unistd.h"
 #include "esp_err.h"
@@ -17,17 +18,12 @@
 
 static const char TAG[] = "lcd";
 
-bool g_i2c_lcd_initialized 	= false;
+bool g_i2c_initialized 	= false;
+bool g_lcd_initialized	= false;
 
 static uint8_t g_display_mode 		= 0x00;
 static uint8_t g_display_control 	= 0x00;
 static uint8_t g_display_function 	= 0x00;
-
-static pthread_mutex_t mutex_lcd;
-static sensor_data_t *sensors;
-static int sensors_n;
-
-static int current_sensor;
 
 /**
  * Initializes the I2C LCD controller
@@ -90,36 +86,191 @@ static void lcd_send_data(char data){
 	if(err != 0) ESP_LOGE(TAG, "Error with the data sent");
 }
 
+/**
+ * Task for LCD
+ */
+
+static void lcd_task(void *pvParameters){
+
+	int sensor_id_to_show = 0;
+	int fr_size, sr_size, move_n;
+	sensor_data_t aux;
+	char number[12];
+
+	for(;;){
+
+		aux = get_sensor_data(sensor_id_to_show);
+
+		if(aux.valuesLen != 0){
+
+			lcd_clear();
+
+			// First row (Sensor name + Third value) -> Each one will take 20 spaces at max
+
+			char sn[MAX_CHARAC_ROW/2];
+			char tv[MAX_CHARAC_ROW/2];
+			memset(&sn, 0, MAX_CHARAC_ROW/2);
+			memset(&tv, 0, MAX_CHARAC_ROW/2);
+
+			// Sensor name
+			strcat(sn, "[Name: ");								// 7 characters
+			strncat(sn, aux.sensorName, 12);					// 12 characters at max
+			strcat(sn, "]");									// 1 character
+
+			lcd_write(sn);
+
+			// Third value
+			if(aux.valuesLen >= 3){
+				lcd_set_cursor(0, 20);
+
+				strcat(tv, "[");								// 1 character
+				strncat(tv, aux.sensor_values[2].valueName, 4);	// 4 characters at max
+				strcat(tv, ": ");								// 2 characters
+
+				// 12 characters by all means
+				if(aux.sensor_values[2].sensor_value_type == INTEGER){
+					snprintf(number, 12, "%d", aux.sensor_values[2].sensor_value.ival);
+					strcat(tv, number);
+				}
+				else if(aux.sensor_values[2].sensor_value_type == FLOAT){
+					snprintf(number, 12, "%f", aux.sensor_values[2].sensor_value.fval);
+					strcat(tv, number);
+				}
+				else{
+					strncat(tv, aux.sensor_values[2].sensor_value.cval, 12);
+				}
+
+				strcat(tv, "]");								// 1 character
+
+				lcd_write(tv);
+			}
+
+			// Second row (First value + Second value) -> Each one will take 20 spaces at max
+
+			char fv[MAX_CHARAC_ROW/2];
+			char sv[MAX_CHARAC_ROW/2];
+			memset(&fv, 0, MAX_CHARAC_ROW/2);
+			memset(&sv, 0, MAX_CHARAC_ROW/2);
+
+			// First value
+			lcd_set_cursor(1, 0);
+
+			strcat(fv, "[");									// 1 character
+			strncat(fv, aux.sensor_values[0].valueName, 4);		// 4 characters at max
+			strcat(fv, ": ");									// 2 characters
+
+			// 12 characters by all means
+			if(aux.sensor_values[0].sensor_value_type == INTEGER){
+				snprintf(number, 12, "%d", aux.sensor_values[0].sensor_value.ival);
+				strcat(fv, number);
+			}
+			else if(aux.sensor_values[0].sensor_value_type == FLOAT){
+				snprintf(number, 12, "%f", aux.sensor_values[0].sensor_value.fval);
+				strcat(fv, number);
+			}
+			else{
+				strncat(fv, aux.sensor_values[0].sensor_value.cval, 12);
+			}
+
+			strcat(fv, "]");									// 1 character
+
+			lcd_write(fv);
+
+			// Second value
+			if(aux.valuesLen >= 2){
+				lcd_set_cursor(1, 20);
+
+				strcat(sv, "[");								// 1 character
+				strncat(sv, aux.sensor_values[1].valueName, 4);	// 4 characters at max
+				strcat(sv, ": ");								// 2 characters
+
+				// 12 characters by all means
+				if(aux.sensor_values[1].sensor_value_type == INTEGER){
+					snprintf(number, 12, "%d", aux.sensor_values[1].sensor_value.ival);
+					strcat(sv, number);
+				}
+				else if(aux.sensor_values[1].sensor_value_type == FLOAT){
+					snprintf(number, 12, "%f", aux.sensor_values[1].sensor_value.fval);
+					strcat(sv, number);
+				}
+				else{
+					strncat(sv, aux.sensor_values[1].sensor_value.cval, 12);
+				}
+
+				strcat(sv, "]");								// 1 character
+
+				lcd_write(sv);
+			}
+
+			// Display movement
+			if(aux.valuesLen >= 3){
+				fr_size = 20 + strlen(tv);
+				sr_size = 20 + strlen(sv);
+			}
+			else if(aux.valuesLen == 2){
+				fr_size = strlen(sn);
+				sr_size = 20 + strlen(sv);
+			}
+			else{
+				fr_size = strlen(sn);
+				sr_size = strlen(fv);
+			}
+
+			if(fr_size > sr_size){
+				move_n = fr_size - 16;
+			}
+			else{
+				move_n = sr_size - 16;
+			}
+
+			if(move_n > 0){
+				vTaskDelay(LCD_TIME_BEFORE_MOVE);
+
+				for(int i = 0; i < move_n; i++){
+					lcd_shift_display_left();
+					vTaskDelay(LCD_TIME_MOVE_FREC);
+				}
+			}
+
+			// Get ready for the next
+			if(sensor_id_to_show < get_recollecters_size() - 1)
+				sensor_id_to_show++;
+			else
+				sensor_id_to_show = 0;
+
+			vTaskDelay(LCD_TIME_TO_SHOW_NEXT);
+		}
+		else{
+			ESP_LOGE(TAG, "Error take place with the sensor that has ID %d", sensor_id_to_show);
+
+			vTaskDelay(LCD_TIME_WHEN_FAIL);
+
+			// Pass to the next one
+			if(sensor_id_to_show < get_recollecters_size() - 1)
+				sensor_id_to_show++;
+			else
+				sensor_id_to_show = 0;
+		}
+	}
+}
+
 void lcd_init(void){
 
 	esp_err_t err;
 	uint8_t cmd_tries[2] = {0x3C, 0x38};
 	uint8_t cmd_4bit_interface[2] = {0x2C, 0x28};
 
-	if(!g_i2c_lcd_initialized){
+	if(!g_i2c_initialized){
 
 		if(i2c_lcd_init() == 0){
-
-			if(pthread_mutex_init (&mutex_lcd, NULL) != 0){
-				ESP_LOGE(TAG,"Failed to initialize the LCD mutex");
-			}
-			else{
-				sensors = (sensor_data_t *)malloc(sizeof(sensor_data_t) * LCD_SENSOR_SIZE);
-				sensors_n = 0;
-
-				current_sensor = 0;
-
-				g_i2c_lcd_initialized = true;
-			}
-
+			g_i2c_initialized = true;
 		}
 		else{
 			ESP_LOGE(TAG, "Error with the I2C-LCD initialization");
 		}
-
 	}
 
-	if(g_i2c_lcd_initialized){
+	if(g_i2c_initialized){
 
 		// 4 bit initialization
 		usleep(50000);
@@ -149,16 +300,20 @@ void lcd_init(void){
 		g_display_control = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 
+		g_lcd_initialized = true;
+
 		lcd_clear();
 
 		g_display_mode = LCD_ENTRYLEFT | LCD_AUTOSCROLLOFF;
 		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
+
+		xTaskCreatePinnedToCore(&lcd_task, "lcd_task", LCD_STACK_SIZE, NULL, LCD_PRIORITY, NULL, LCD_CORE_ID);
 	}
 }
 
 void lcd_clear(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		lcd_send_command(LCD_CLEARDISPLAY);
 		usleep(2000);
 	}
@@ -169,7 +324,7 @@ void lcd_clear(void){
 
 void lcd_home(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		lcd_send_command(LCD_RETURNHOME);
 		usleep(2000);
 	}
@@ -180,7 +335,7 @@ void lcd_home(void){
 
 void lcd_display_on(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_control |= LCD_DISPLAYON;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 	}
@@ -191,7 +346,7 @@ void lcd_display_on(void){
 
 void lcd_display_off(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_control &= ~LCD_DISPLAYON;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 	}
@@ -202,7 +357,7 @@ void lcd_display_off(void){
 
 void lcd_cursor_on(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_control |= LCD_CURSORON;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 	}
@@ -213,7 +368,7 @@ void lcd_cursor_on(void){
 
 void lcd_cursor_off(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_control &= ~LCD_CURSORON;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 	}
@@ -224,7 +379,7 @@ void lcd_cursor_off(void){
 
 void lcd_cursor_blink_on(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_control |= LCD_BLINKON;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 	}
@@ -235,7 +390,7 @@ void lcd_cursor_blink_on(void){
 
 void lcd_cursor_blink_off(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_control &= ~LCD_BLINKON;
 		lcd_send_command(LCD_DISPLAYCONTROL | g_display_control);
 	}
@@ -246,7 +401,7 @@ void lcd_cursor_blink_off(void){
 
 void lcd_left_to_right(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_mode |= LCD_ENTRYLEFT;
 		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
 	}
@@ -257,7 +412,7 @@ void lcd_left_to_right(void){
 
 void lcd_right_to_left(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		g_display_mode &= ~LCD_ENTRYLEFT;
 		lcd_send_command(LCD_ENTRYMODESET | g_display_mode);
 	}
@@ -268,7 +423,7 @@ void lcd_right_to_left(void){
 
 void lcd_shift_display_left(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		lcd_send_command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVELEFT);
 	}
 	else{
@@ -278,7 +433,7 @@ void lcd_shift_display_left(void){
 
 void lcd_shift_display_right(void){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		lcd_send_command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVERIGHT);
 	}
 	else{
@@ -290,7 +445,7 @@ void lcd_set_cursor(int row, int col){
 
 	uint8_t pos;
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		switch (row){
 
 			case 0:
@@ -315,165 +470,8 @@ void lcd_set_cursor(int row, int col){
 
 void lcd_write(char *str){
 
-	if(g_i2c_lcd_initialized){
+	if(g_lcd_initialized){
 		while(*str) lcd_send_data(*str++);
-	}
-	else{
-		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
-	}
-}
-
-void lcd_one_more_sensor(void){
-
-	if(g_i2c_lcd_initialized){
-		pthread_mutex_lock(&mutex_lcd);
-
-			if(sensors_n >= LCD_SENSOR_SIZE){
-				ESP_LOGE(TAG, "ERROR, you can't manage more than %d sensors with the LCD", LCD_SENSOR_SIZE);
-			}
-			else{
-				sensors_n++;
-			}
-
-		pthread_mutex_unlock(&mutex_lcd);
-	}
-	else{
-		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
-	}
-}
-
-void lcd_one_less_sensor(int sensor_id){
-
-	if(g_i2c_lcd_initialized){
-		pthread_mutex_lock(&mutex_lcd);
-
-		if((sensor_id >= sensors_n) || (sensor_id < 0)){
-			ESP_LOGE(TAG, "ERROR, you can't delete a non-existant sensor");
-		}
-		else{
-			for(int i = sensor_id; i < sensors_n - 1; i++){
-				sensors[i] = sensors[i + 1];
-			}
-
-			memset(&sensors[sensors_n - 1], 0, sizeof(sensor_data_t));
-			sensors_n--;
-		}
-
-		pthread_mutex_unlock(&mutex_lcd);
-	}
-	else{
-		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
-	}
-}
-
-void lcd_update_sensor_data(int sensor_id, sensor_data_t sensor_data){
-
-	if(g_i2c_lcd_initialized){
-		pthread_mutex_lock(&mutex_lcd);
-
-		if((sensor_id >= sensors_n) || (sensor_id < 0)){
-			ESP_LOGE(TAG, "ERROR, you can't update a non-existant sensor");
-		}
-		else{
-			sensors[sensor_id] = sensor_data;
-		}
-
-		pthread_mutex_unlock(&mutex_lcd);
-	}
-	else{
-		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
-	}
-}
-
-void lcd_show_next_sensor_data(void){
-
-	sensor_data_t sensor_data;
-
-	if(g_i2c_lcd_initialized){
-
-		pthread_mutex_lock(&mutex_lcd);
-
-		sensor_data = sensors[current_sensor];
-
-		pthread_mutex_unlock(&mutex_lcd);
-
-		lcd_clear();
-
-		// First row (Sensor ID + Sensor Name)
-
-		char fr[MAX_CHARAC_ROW];
-		char auxfr[10];
-
-		memset(&fr, 0, MAX_CHARAC_ROW);
-		memset(&auxfr, 0, 10);
-
-		strcat(fr, "[Sensor id: ");
-
-		sprintf(auxfr, "%d", current_sensor);
-
-		strcat(fr, auxfr);
-		strcat(fr, "] [Name: ");
-		strncat(fr, sensor_data.sensorName, 15);
-		strcat(fr, "]");
-
-		lcd_set_cursor(0, 0);
-		lcd_write(fr);
-
-		// Second row (Sensor Values)
-
-		char sr[MAX_CHARAC_ROW];
-		char auxsr[10];
-
-		memset(&sr, 0, MAX_CHARAC_ROW);
-		memset(&auxsr, 0, 10);
-
-		for(int i = 0; i < sensor_data.valuesLen; i++){
-
-			strcat(sr, "[");
-
-			if(sensor_data.sensor_values[i].sensor_value_type == INTEGER){
-				strncat(sr, sensor_data.sensor_values[i].valueName, 5);
-				strcat(sr, ": ");
-
-				sprintf(auxsr, "%d", sensor_data.sensor_values[i].sensor_value.ival);
-
-				strcat(sr, auxsr);
-			}
-			else if(sensor_data.sensor_values[i].sensor_value_type == FLOAT){
-				strncat(sr, sensor_data.sensor_values[i].valueName, 5);
-				strcat(sr, ": ");
-
-				sprintf(auxsr, "%f", sensor_data.sensor_values[i].sensor_value.fval);
-
-				strcat(sr, auxsr);
-			}
-			else{
-				strncat(sr, sensor_data.sensor_values[i].valueName, 5);
-				strcat(sr, ": ");
-				strncat(sr, sensor_data.sensor_values[i].sensor_value.cval, 10);
-			}
-
-			if(i < sensor_data.valuesLen - 1){
-				strcat(sr, "] ");
-			}
-			else{
-				strcat(sr, "]");
-			}
-		}
-
-		lcd_set_cursor(1, 0);
-		lcd_write(sr);
-
-		pthread_mutex_lock(&mutex_lcd);
-
-		if(current_sensor < sensors_n - 1){
-			current_sensor++;
-		}
-		else{
-			current_sensor = 0;
-		}
-
-		pthread_mutex_unlock(&mutex_lcd);
 	}
 	else{
 		ESP_LOGE(TAG, "Error, you can't operate with the LCD without initializing it");
