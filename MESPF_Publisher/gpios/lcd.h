@@ -9,7 +9,6 @@
 #define MAIN_GPIOS_LCD_H_
 
 #include "driver/i2c.h"
-#include "recollecter.h"
 
 #define LCD_SDA_GPIO			21
 #define LCD_SCL_GPIO			22
@@ -22,7 +21,10 @@
 #define MAX_TICKS_TO_WAIT		1000		// 1000 ms -> 1 s
 #define MAX_CHARAC_ROW			40			// Only 16 are visible at once (per row)
 
-#define LCD_SENSOR_SIZE 		5			// Should be the same number as RECOLLECTER_SIZE in "recollecter.h"
+#define LCD_TIME_TO_SHOW_NEXT	100 * 3		// 1 second = 100 ticks
+#define LCD_TIME_BEFORE_MOVE	100 * 3
+#define LCD_TIME_MOVE_FREC		100 / 2
+#define LCD_TIME_WHEN_FAIL		100
 
 /**
  * [Note] 8 bits: bit 7 => D7 / bit 6 => D6 / bit 5 => D5 / bit 4 => D4 / bit 3 => LED+ / bit 2 => en / bit 1 => R/W / bit 0 => RS
@@ -139,28 +141,5 @@ void lcd_set_cursor(int row, int col);
  * @param *str, char pointer to the string message you want to show on the display
  */
 void lcd_write(char *str);
-
-/**
- * Indicates that one sensor is added to the system
- */
-void lcd_one_more_sensor(void);
-
-/**
- * Indicates that one sensor is removed from the system
- * @param sensor_id literally the ID of the sensor to be removed
- */
-void lcd_one_less_sensor(int sensor_id);
-
-/**
- * Updates the values of the given sensor
- * @param sensor_id literally the ID of the sensor to be updated
- * @param sensor_data the new values
- */
-void lcd_update_sensor_data(int sensor_id, sensor_data_t sensor_data);
-
-/**
- * Show on the LCD the data of the next sensor
- */
-void lcd_show_next_sensor_data(void);
 
 #endif /* MAIN_GPIOS_LCD_H_ */
