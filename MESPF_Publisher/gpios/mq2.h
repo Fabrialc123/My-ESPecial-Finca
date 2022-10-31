@@ -17,6 +17,8 @@ static const adc1_channel_t channel = ADC1_CHANNEL_6;     	//ADC1 channel 6 -> G
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
 
+#define MQ2_TIME_TO_UPDATE_DATA	100 						// 1 second = 100 ticks
+
 /*
  * Initializes MQ2 peripheral
  */
