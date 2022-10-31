@@ -46,9 +46,11 @@
 
 #include "recollecter.h"
 
-#define DHT22_GPIO				25
+#define DHT22_GPIO					25
 
-#define DHT22_MAX_DATA 			5
+#define DHT22_MAX_DATA 				5
+
+#define DHT22_TIME_TO_UPDATE_DATA	100 * 5 // 1 second = 100 ticks
 
 /*
  * Initializes DTH22 peripheral
