@@ -36,6 +36,14 @@
 #define DHT22_PRIORITY					4
 #define DHT22_CORE_ID					1
 
+#define HC_RS04_STACK_SIZE				4096
+#define HC_RS04_PRIORITY				4
+#define HC_RS04_CORE_ID					1
+
+#define SO_SEN_STACK_SIZE				4096
+#define SO_SEN_PRIORITY					4
+#define SO_SEN_CORE_ID					1
+
 #define MQ2_STACK_SIZE					4096
 #define MQ2_PRIORITY					5
 #define MQ2_CORE_ID						1
