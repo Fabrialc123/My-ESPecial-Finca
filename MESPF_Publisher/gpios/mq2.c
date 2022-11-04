@@ -37,7 +37,7 @@ static void mq2_task(void *pvParameters){
 		auxRead_raw = 0;
 
         for (int i = 0; i < N_SAMPLES; i++) {
-        	auxRead_raw += adc1_get_raw(channel);
+        	auxRead_raw += adc1_get_raw(channel_mq2);
         }
 
         read_raw = auxRead_raw / N_SAMPLES;
@@ -55,8 +55,8 @@ void mq2_init(void){
 	}
 	else{
 
-		adc1_config_width(width);
-		adc1_config_channel_atten(channel, atten);
+		adc1_config_width(width_mq2);
+		adc1_config_channel_atten(channel_mq2, atten_mq2);
 
 		read_raw = 0;
 
