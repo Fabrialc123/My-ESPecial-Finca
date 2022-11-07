@@ -45,7 +45,7 @@ pthread_mutex_unlock(&mutex_RECOLLECTER);
 	return size;
 }
 
-int get_sensor_data_json (int sensor_id, char *data){
+int get_sensor_data_json (int sensor_id, char* data){
 	char aux[CHAR_LENGTH];
 	sensor_data_t sensor_data;
 	int i;
@@ -55,19 +55,18 @@ int get_sensor_data_json (int sensor_id, char *data){
 
 	if (sensor_data.valuesLen == 0) return -1;
 
-	strcat(data, "{\"");
-	strcat(data, sensor_data.sensorName);
-	strcat(data, "\":");
-	strcat(data, "{");
-	len += 5 + strlen(sensor_data.sensorName);
+	strcpy(data, "{");
 	for (i = 0; i < sensor_data.valuesLen;i++){
-		if (i > 0){
+		if(i > 0){
 			strcat(data,",");
-			len++;
 		}
+		memset(&aux,0,CHAR_LENGTH);
+		sprintf(aux, "%d",i + 1);
 		strcat(data,"\"");
-		strcat(data, sensor_data.sensor_values[i].valueName);
+		strcat(data, aux);
 		strcat(data,"\":");
+
+		memset(&aux,0,CHAR_LENGTH);
 		if (sensor_data.sensor_values[i].sensor_value_type == INTEGER){
 			sprintf(aux, "%d",sensor_data.sensor_values[i].sensor_value.ival);
 		}else if (sensor_data.sensor_values[i].sensor_value_type == FLOAT){
@@ -78,16 +77,23 @@ int get_sensor_data_json (int sensor_id, char *data){
 			strcat(aux, "\"");
 		}
 		strcat(data, aux);
-
-
-		len += 1 + strlen( sensor_data.sensor_values[i].valueName) + 1 + strlen(aux) + 1;
 	}
 	strcat(data, "}");
-	strcat(data, "}");
-	len += 2;
+
+	len = strlen(data);
 
 	free(sensor_data.sensor_values);
 	return len;
+}
+
+void get_sensor_data_name(int sensor_id, char *name){
+	sensor_data_t sensor_data;
+
+	sensor_data = get_sensor_data(sensor_id);
+
+	if (sensor_data.valuesLen == 0) return;
+
+	strcpy(name, sensor_data.sensorName);
 }
 
 sensor_data_t get_sensor_data (int sensor_id){
