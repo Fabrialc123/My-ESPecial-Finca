@@ -5,12 +5,12 @@
  */
 
 
+#include <mqtt/mqtt_app.h>
 #include "nvs_flash.h"
 
 #include "wifi_app.h"
 #include "http_server.h"
 #include "esp_log.h"
-#include "mqtt_app.h"
 #include "recollecter.h"
 
 #include "tests.c"
@@ -40,7 +40,8 @@ void app_main(void)
 	recollecter_start();
 
 
-	TEST_mqtt_app_recollect();
+	TEST_recollecter_register_recollecter();
+	//TEST_mqtt_app_send_alert();			// WARNING: INFINITE LOOP
 	//TEST_mqtt_app_refresh();
 
 }
