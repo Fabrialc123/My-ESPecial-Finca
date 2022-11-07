@@ -10,6 +10,8 @@
 #include "recollecter.h"
 #include <string.h>
 
+#include "mqtt/mqtt_commands.h"
+
 static const char TAG[] = "TEST";
 
 sensor_data_t TEST_recollecter (void){
@@ -37,7 +39,7 @@ sensor_data_t TEST_recollecter (void){
 	return aux;
 }
 
-void TEST_mqtt_app_recollect(void){
+void TEST_recollecter_register_recollecter(void){
 	int i, aux;
 
 	for (i = 0; i < 1 ;i++){ // Can be changed to RECOLLECTER_SIZE
@@ -46,10 +48,18 @@ void TEST_mqtt_app_recollect(void){
 	}
 }
 
-void TEST_mqtt_app_refresh(void){
-	mqtt_app_refresh_TEST();
+void TEST_mqtt_app_send_alert(void){
+	int i,id;
+	id = 1;
+	ESP_LOGE(TAG, "TEST_mqtt_app_send_alert: ENTERING INTO AN INFINITE LOOP!");
+	while(1 == 1){
+		for(i = 0; i < 6; i++){
+			mqtt_app_send_alert("TESTING", id, "Testing alert system every 10 seconds");
+			vTaskDelay(100*10);
+		}
+		id++;
+	}
 }
-
 
 
 
