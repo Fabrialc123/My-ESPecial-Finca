@@ -12,7 +12,7 @@
 
 #define RECOLLECTER_SIZE 5
 #define CHAR_LENGTH 20
-#define MAX_STRING_LENGTH 128
+#define MAX_STRING_LENGTH 255
 
 typedef enum{
 	INTEGER = 0,
@@ -46,6 +46,8 @@ int register_recollecter (recollecter_function rtr);
 int get_recollecters_size (void);
 
 int get_sensor_data_json (int sensor_id, char *data);
+
+void get_sensor_data_name(int sensor_id, char *name);
 
 sensor_data_t get_sensor_data (int sensor_id);
 
