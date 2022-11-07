@@ -33,7 +33,6 @@ esp_netif_t* esp_netif_ap = NULL;
 
 pthread_mutex_t mutex_WIFI;
 
-static int s_retry_num = 0;
 static int WIFI_CONNECTED = 0;
 
 /**
@@ -58,13 +57,13 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 
 			case WIFI_EVENT_STA_DISCONNECTED:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
-				while (s_retry_num < MAX_CONNECTION_RETRIES){
-					s_retry_num++;
-					ESP_LOGI(TAG," Retry nº %i to connect to the AP ", s_retry_num);
-					esp_wifi_connect();
-				}
+				pthread_mutex_lock(&mutex_WIFI);
+					WIFI_CONNECTED = 0;
+				pthread_mutex_unlock(&mutex_WIFI);
 
-				if (s_retry_num >= MAX_CONNECTION_RETRIES) ESP_LOGI(TAG, "FAILED TO CONNECT TO THE AP %s and PSSWD: %s",WIFI_STA_SSID, WIFI_STA_PASSWORD);
+				ESP_LOGE(TAG," Retrying to reconnect to SSID: %s and PSSWD: %s ", WIFI_STA_SSID, WIFI_STA_PASSWORD);
+				esp_wifi_connect();
+
 				break;
 
 			case WIFI_EVENT_STA_STOP:
@@ -197,7 +196,3 @@ void wifi_app_start(void){
 	while(!is_wifi_connected());
 
 }
-
-
-
-
