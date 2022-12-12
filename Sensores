@@ -1,0 +1,13 @@
+DHT22
+- Nivel de Humedad en ambiente (Float 0.0 - 100.0)  
+- Temperatura (Cº) (Float -inf - +inf) 
+
+MQ2
+- Nivel de concentración de partículas de gas o humo (INT 0 - Inf) (A CAMBIAR POR FLOAT de %)
+
+HC-RS04
+- Nivel de agua (%) (Float 0.0 - 100.0)
+
+SO-SEN
+- Nivel de humedad en tierra (%) (Float 0.0 - 100.0)
+
