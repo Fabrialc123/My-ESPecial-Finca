@@ -1,8 +1,28 @@
+Todos los mensajes tendrán el siguiente formato:
+{
+"DT":{...},
+"TS": "hh:mm:ss DD/MM/YYYY"
+}
+
+Siendo lo de dentro de "DT" los valores de cada sensor, y "TS" el TimeStamp (hora en la que el mensaje se ha enviado)
+
 STATUS
 - Dirección IP (STRING 192.168.68.XX)
 - Identificador (STRING ESP32_XXXXXX)
 - Hora (STRING HH:MM:SS)
 - Tiempo en funcionamiento (UpTime) (STRING DDD HH:MM) siendo DDD = Días
+
+Ejemplo de STATUS:
+{
+  "DT": {
+    "1": "192.168.68.78",
+    "2": "ESP32_f867BC",
+    "3": "21:23:01",
+    "4": "003 00:19"
+  },
+  "TS": "21:23:01 29/12/2022"
+}
+
 
 DHT22
 - Nivel de Humedad en ambiente (Float 0.0 - 100.0)  
