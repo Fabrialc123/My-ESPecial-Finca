@@ -6,6 +6,12 @@ Todos los mensajes tendrán el siguiente formato:
 
 Siendo lo de dentro de "DT" los valores de cada sensor, y "TS" el TimeStamp (hora en la que el mensaje se ha enviado)
 
+Cuando se haga un SCAN se obtendrá lo siguiente de ejemplo:
+{
+  "DT": "ESP32_f867BC",
+  "TS": "21:44:11 29/12/2022"
+}
+
 STATUS
 - Dirección IP (STRING 192.168.68.XX)
 - Identificador (STRING ESP32_XXXXXX)
