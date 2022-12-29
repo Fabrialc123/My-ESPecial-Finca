@@ -1,3 +1,9 @@
+STATUS
+- Dirección IP (STRING 192.168.68.XX)
+- Identificador (STRING ESP32_XXXXXX)
+- Hora (STRING HH:MM:SS)
+- Tiempo en funcionamiento (UpTime) (STRING DDD HH:MM) siendo DDD = Días
+
 DHT22
 - Nivel de Humedad en ambiente (Float 0.0 - 100.0)  
 - Temperatura (Cº) (Float -inf - +inf) 
