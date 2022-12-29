@@ -21,6 +21,8 @@
 
 #include <pthread.h>
 
+#include <tcpip_adapter.h> // TO GET IP
+
 static const char TAG[] = "wifi_app";
 
 //extern int WIFI_CONNECTED;
@@ -196,3 +198,19 @@ void wifi_app_start(void){
 	while(!is_wifi_connected());
 
 }
+
+void wifi_app_getIP(char *ip){
+
+	tcpip_adapter_ip_info_t ipInfo;
+
+	if (is_wifi_connected()){
+		tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ipInfo);
+		sprintf(ip, IPSTR, IP2STR(&ipInfo.ip));
+	}else {
+		sprintf(ip, "N/A");
+	}
+}
+
+
+
+
