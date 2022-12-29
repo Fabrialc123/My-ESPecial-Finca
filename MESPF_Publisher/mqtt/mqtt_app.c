@@ -41,6 +41,7 @@
 #include "recollecter.h"
 
 #include "mqtt_commands.h"
+#include "status.h"
 
 static const char TAG[] = "MQTT_APP";
 
@@ -69,6 +70,19 @@ static void set_personal_topic_name(void){
 
 }
 
+void mqtt_app_format_data(char *src){
+	char timestamp[20];
+	char aux[MQTT_APP_MAX_DATA_LENGTH];
+	status_getDateTime(timestamp);
+	strcpy(aux, "{\"DT\":");
+	strcat(aux,src);
+	strcat(aux,",\"TS\":\"");
+	strcat(aux,timestamp);
+	strcat(aux,"\"}");
+
+	strcpy(src,aux);
+
+}
 
 int is_mqtt_connected(){
 	int aux;
@@ -250,6 +264,7 @@ static void mqtt_app_task(void *pvParameters){
 					ESP_LOGI(TAG, "MQTT_APP_MSG_PUBLISH_DATA to topic %s",msg.src);
 
 					//mqtt_app_send_data(msg.data);
+					mqtt_app_format_data(msg.data);
 					esp_mqtt_client_publish(client, msg.src, msg.data, 0, MQTT_APP_QOS, 0);
 					ESP_LOGI(TAG, "sent publish successful");
 
@@ -330,6 +345,7 @@ void mqtt_app_start(void)
 
 }
 
-void mqtt_app_get_personal_name(char *res){
-	strcpy(res, MQTT_APP_PERSONAL_NAME);
+void mqtt_app_getID(char *id){
+	strcpy(id, MQTT_APP_PERSONAL_NAME);
 }
+

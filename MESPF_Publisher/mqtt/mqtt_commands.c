@@ -49,7 +49,7 @@ void mqtt_app_send_info(char* topic){
 	char sensorName[CHAR_LENGTH];
 	char sensor_topic[MQTT_APP_MAX_TOPIC_LENGTH];
 
-	mqtt_app_get_personal_name(personal_name);
+	mqtt_app_getID(personal_name);
 
 	recollecters = get_recollecters_size();
 	for (i = 0; i < recollecters;i++){
@@ -75,14 +75,19 @@ void mqtt_app_send_info(char* topic){
 void mqtt_app_scan_command(char* src){
 	char topic[MQTT_APP_MAX_TOPIC_LENGTH];
 	char personal_name[MQTT_APP_MAX_DATA_LENGTH];
+	char data[MQTT_APP_MAX_DATA_LENGTH];
 	memset(&topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
-	/*strcpy(aux,topic);
-	strcat(aux,"/");
-	strcat(aux,SCAN_RESP_TOPIC);*/
+
+	mqtt_app_getID(personal_name);
+
+	strcpy(data,"\"");
+	strcat(data,personal_name);
+	strcat(data,"\"");
+
 	concatenate_topic(USERS_TOPIC, src, SCAN_RESP_TOPIC, NULL, NULL, NULL, NULL, topic);
-	//esp_mqtt_client_publish(client, topic, MQTT_APP_PERSONAL_NAME, 0, MQTT_APP_QOS, 0);
-	mqtt_app_get_personal_name(personal_name);
-	mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, topic, personal_name);
+
+
+	mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, topic, data);
 }
 
 void mqtt_app_send_alert(char* sensor_name, int id, char* dt){
@@ -94,7 +99,7 @@ void mqtt_app_send_alert(char* sensor_name, int id, char* dt){
 	memset(&topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
 	memset(&data,0,MQTT_APP_MAX_DATA_LENGTH);
 
-	mqtt_app_get_personal_name(personal_name);
+	mqtt_app_getID(personal_name);
 	concatenate_topic(SENSORS_TOPIC, personal_name, sensor_name, "1", ALERT_TOPIC, NULL, NULL, topic);
 
 	strcpy(data, "{\"ID\":");

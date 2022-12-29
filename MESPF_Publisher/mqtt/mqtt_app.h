@@ -17,13 +17,13 @@
 #define MQTT_APP_QOS						0
 
 #define MQTT_APP_PORT 						1883
-//#define MQTT_APP_HOST 						"192.168.68.55"
+#define MQTT_APP_HOST 						"192.168.68.65"
 //#define MQTT_APP_URI 						"mqtt://broker.hivemq.com"
-#define MQTT_APP_URI 						"mqtt://mqtt.eclipseprojects.io"
+//#define MQTT_APP_URI 						"mqtt://mqtt.eclipseprojects.io"
 //#define MQTT_APP_URI 						"mqtt://iot.eclipse.org"
 
 #define MQTT_APP_MAX_TOPIC_LENGTH	128
-#define MQTT_APP_MAX_DATA_LENGTH	128
+#define MQTT_APP_MAX_DATA_LENGTH	255
 #define MQTT_APP_QUEUE_HANDLE_SIZE	10
 
 
@@ -63,6 +63,6 @@ BaseType_t mqtt_app_send_message(mqtt_app_msg_e msgID, char src[MQTT_APP_MAX_TOP
  */
 void mqtt_app_start(void);
 
-void mqtt_app_get_personal_name(char *res);
+void mqtt_app_getID(char *id);
 
 #endif /* MAIN_MQTT_MQTT_APP_H_ */
