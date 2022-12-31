@@ -12,8 +12,8 @@
 #include "recollecter.h"
 //#include "mqtt_app.c"
 
-#define MQTT_APP_TIME_TO_SEND_DATA			100 * 30 // 1 second = 100 ticks
-#define MQTT_APP_SECONDS_TO_RECONNECT 		100 * 30
+#define MQTT_APP_TIME_TO_SEND_DATA			100 * 300 // 1 second = 100 ticks
+#define MQTT_APP_SECONDS_TO_RECONNECT 		100 * 120
 #define MQTT_APP_QOS						0
 
 #define MQTT_APP_PORT 						1883

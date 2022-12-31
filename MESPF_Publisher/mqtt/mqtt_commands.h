@@ -10,6 +10,11 @@
 
 #include "mqtt_app.h"
 
+#define SET_COMMAND_SRC	20
+#define SET_COMMAND_ID	5		// 0 - 9999
+#define SET_1_COMMAND_DATE	11  // DD/MM/YYYY
+#define SET_1_COMMAND_TIME	9	// hh:mm:ss
+
 void mqtt_app_process_command(char* topic,char* data);
 
 void mqtt_app_send_info(char* topic);
