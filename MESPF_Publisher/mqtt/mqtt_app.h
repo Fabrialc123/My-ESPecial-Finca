@@ -17,9 +17,9 @@
 #define MQTT_APP_QOS						0
 
 #define MQTT_APP_PORT 						1883
-#define MQTT_APP_HOST 						"192.168.68.65"
+//#define MQTT_APP_HOST 						"192.168.68.65"
 //#define MQTT_APP_URI 						"mqtt://broker.hivemq.com"
-//#define MQTT_APP_URI 						"mqtt://mqtt.eclipseprojects.io"
+#define MQTT_APP_URI 						"mqtt://mqtt.eclipseprojects.io"
 //#define MQTT_APP_URI 						"mqtt://iot.eclipse.org"
 
 #define MQTT_APP_MAX_TOPIC_LENGTH	128
