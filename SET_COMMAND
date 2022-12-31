@@ -1,0 +1,36 @@
+Se ha implementado la capacidad de poder cambiar la fecha y hora del ESP32 vía MQTT.
+
+Para ello bastaría con enviar un mensaje al tópico CMD/SET con el siguiente formato:
+SRC;ID;DATE;TIME
+
+SRC: Nombre del usuario que hace la modificación (MÁX. 20 Caracteres). NO PUEDE SER NULO
+
+ID: Identificador del mensaje , es un número del 0-9999. Se utiliza para que el usuario haga un seguimiento de la respuesta, pues 
+el microcontrolador responderá el resultado de la operación con ese ID. NO PUEDE SER NULO
+
+DATE: en el formato DD/MM/YYYY, ejemplo 31/12/2022, NO VALEN: 1/12/2022, 20/3/2022 ni 10/02/22. Puede ser nulo.
+
+TIME: con el formato HH:MM:SS, ejemplo 01:15:34, NO VALEN: 1:15:34 , 10:3:20, ni 01:04:0. Puede ser nulo
+
+EJEMPLOS DE ENVÍO:
+FABRIALC;1;31/12/2022;03:08:00
+EJUEZ;2;;12:34:48
+RCINCEA;67;;
+TEST;896;;07:56:23
+
+Si el número de argumentos, el SRC y el ID son válidos, el ESP32 publicará en el tópico MESPF/USR/SRC/RESP, un mensaje con el siguiente formato:
+{
+  "DT": {
+    "ID": X,
+    "RES": Y
+  },
+  "TS": "HH:MM:SS DD/MM/YYYY"
+}
+
+Siendo RES el resultado de la operación, tomando uno de los siguientes valores:
+  1 - El comando se ha procesado con éxito.
+  -1 - Algún parámetro tiene un tamaño inválido. (Ejemplo enviar como TIME 1:45:30 o 12:5:23)
+  -2 - Algún parámetro tiene un formato inválido. (Ejemplo enviar como DATE 25/ABRIL/2022 o 56/13/2022)
+
+
+
