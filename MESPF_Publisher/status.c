@@ -70,9 +70,48 @@ bool status_getDateTime(char *dt){
 }
 
 
-bool status_setDateTime(const char *dt){
+int status_setDateTime(const char *date,const char *timeC){
+	struct tm timeInfo, timeInfoNOW;
+	struct timeval tv_now;
+	time_t now;
 
-	return true;
+	time(&now);
+	localtime_r(&now, &timeInfoNOW);
+
+	strptime(date,"%d/%m/%Y",&timeInfo);
+	strptime(timeC,"%H:%M:%S",&timeInfo);
+
+	if (*date == '\0'){
+		timeInfo.tm_mday = timeInfoNOW.tm_mday;
+		timeInfo.tm_mon = timeInfoNOW.tm_mon;
+		timeInfo.tm_year = timeInfoNOW.tm_year;
+	}
+	else if (timeInfo.tm_mday < 0 || timeInfo.tm_mday > 31 || timeInfo.tm_mon < 0 || timeInfo.tm_mon > 11 ||timeInfo.tm_year < 0 || timeInfo.tm_year > 1100){
+		ESP_LOGE(TAG2,"status_setDateTime, invalid DATE format");
+		return -2;
+	}
+
+	if(*timeC == '\0'){
+		timeInfo.tm_sec = timeInfoNOW.tm_sec;
+		timeInfo.tm_min = timeInfoNOW.tm_min;
+		timeInfo.tm_hour = timeInfoNOW.tm_hour;
+
+	}else if (timeInfo.tm_sec < 0 || timeInfo.tm_sec > 60 || timeInfo.tm_min < 0 || timeInfo.tm_min > 59 || timeInfo.tm_hour < 0 || timeInfo.tm_hour > 23){
+		ESP_LOGE(TAG2,"status_setDateTime, invalid TIME format");
+		return -2;
+	}
+
+	if (!rtc_setDateTime(&timeInfo)) ESP_LOGE(TAG2,"rtc_setDateTime failed!");
+
+	pthread_mutex_lock(&mutex_STATUS);
+	upTimeAGG = difftime(now, start) + upTimeAGG;
+	start = mktime(&timeInfo);
+	tv_now.tv_sec = start;
+	tv_now.tv_usec = 0;
+	settimeofday(&tv_now, NULL);
+	pthread_mutex_unlock(&mutex_STATUS);
+
+	return 1;
 }
 
 void status_getTime(char *tm){

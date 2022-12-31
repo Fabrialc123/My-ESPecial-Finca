@@ -12,8 +12,8 @@
 
 void status_start();
 
-bool status_getDateTime();
-bool status_setDateTime();
+bool status_getDateTime(char *dt);
+int status_setDateTime(const char *date,const char *time);
 
 sensor_data_t status_recollecter (void);
 
