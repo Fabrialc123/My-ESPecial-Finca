@@ -195,7 +195,9 @@ void wifi_app_start(void){
 
 	xTaskCreatePinnedToCore(&wifi_app_task, "wifi_app_task", WIFI_APP_TASK_STACK_SIZE, NULL, WIFI_APP_TASK_PRIORITY, NULL, WIFI_APP_TASK_CORE_ID);
 
-	while(!is_wifi_connected());
+	while(!is_wifi_connected()){
+		vTaskDelay(10);
+	}
 
 }
 
