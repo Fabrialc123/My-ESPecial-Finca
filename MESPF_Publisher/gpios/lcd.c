@@ -251,6 +251,8 @@ static void lcd_task(void *pvParameters){
 			else
 				sensor_id_to_show = 0;
 		}
+		
+		free(aux.sensor_values);
 	}
 }
 
