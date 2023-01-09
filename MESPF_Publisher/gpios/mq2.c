@@ -54,15 +54,25 @@ void mq2_init(void){
 		ESP_LOGE(TAG,"Failed to initialize the MQ2 mutex");
 	}
 	else{
+		int res;
 
-		adc1_config_width(width_mq2);
-		adc1_config_channel_atten(channel_mq2, atten_mq2);
+		res = register_recollecter(&mq2_get_sensor_data);
 
-		read_raw = 0;
+		if(res == 1){
+			ESP_LOGI(TAG, "MQ2 recollecter successfully registered");
 
-		xTaskCreatePinnedToCore(&mq2_task, "mq2_task", MQ2_STACK_SIZE, NULL, MQ2_PRIORITY, NULL, MQ2_CORE_ID);
+			adc1_config_width(width_mq2);
+			adc1_config_channel_atten(channel_mq2, atten_mq2);
 
-		g_mq2_initialized = true;
+			read_raw = 0;
+
+			xTaskCreatePinnedToCore(&mq2_task, "mq2_task", MQ2_STACK_SIZE, NULL, MQ2_PRIORITY, NULL, MQ2_CORE_ID);
+
+			g_mq2_initialized = true;
+		}
+		else{
+			ESP_LOGE(TAG, "Error, MQ2 recollecter hasn't been registered");
+		}
 	}
 }
 
