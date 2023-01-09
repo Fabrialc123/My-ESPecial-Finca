@@ -103,20 +103,20 @@ void hc_rs04_init(void){
 		ESP_LOGE(TAG,"Failed to initialize the HC_RS04 mutex");
 	}
 	else{
-		int res;
+	    // Create the queue
+	    cap_queue = xQueueCreate(1, sizeof(uint32_t));
 
-		res = register_recollecter(&hc_rs04_get_sensor_data);
+	    if (cap_queue == NULL) {
+	        ESP_LOGE(TAG, "Failed creating the message queue");
+	    }
+	    else{
+	    	int res;
 
-		if(res == 1){
-			ESP_LOGI(TAG, "HC_RS04 recollecter successfully registered");
+	    	res = register_recollecter(&hc_rs04_get_sensor_data);
 
-		    // Create the queue
-		    cap_queue = xQueueCreate(1, sizeof(uint32_t));
+			if(res == 1){
+				ESP_LOGI(TAG, "HC-RS04 recollecter successfully registered");
 
-		    if (cap_queue == NULL) {
-		        ESP_LOGE(TAG, "Failed creating the message queue");
-		    }
-		    else{
 				water_level_percentage = 0;
 
 				// Set echo pin
@@ -148,11 +148,11 @@ void hc_rs04_init(void){
 				xTaskCreatePinnedToCore(&hc_rs04_task, "hc_rs04_task", HC_RS04_STACK_SIZE, NULL, HC_RS04_PRIORITY, NULL, HC_RS04_CORE_ID);
 
 				g_hc_rs04_initialized = true;
-		    }
-		}
-		else{
-			ESP_LOGE(TAG, "Error, HC_RS04 recollecter hasn't been registered");
-		}
+			}
+			else{
+				ESP_LOGE(TAG, "Error, HC-RS04 recollecter hasn't been registered");
+			}
+	    }
 	}
 }
 
