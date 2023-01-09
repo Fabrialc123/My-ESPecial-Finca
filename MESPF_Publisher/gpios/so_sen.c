@@ -54,15 +54,25 @@ void so_sen_init(void){
 		ESP_LOGE(TAG,"Failed to initialize the SO_SEN mutex");
 	}
 	else{
+		int res;
 
-		adc1_config_width(width_so_sen);
-		adc1_config_channel_atten(channel_so_sen, atten_so_sen);
+		res = register_recollecter(&so_sen_get_sensor_data);
 
-		read_raw = 0;
+		if(res == 1){
+			ESP_LOGI(TAG, "SO-SEN recollecter successfully registered");
 
-		xTaskCreatePinnedToCore(&so_sen_task, "so_sen_task", SO_SEN_STACK_SIZE, NULL, SO_SEN_PRIORITY, NULL, SO_SEN_CORE_ID);
+			adc1_config_width(width_so_sen);
+			adc1_config_channel_atten(channel_so_sen, atten_so_sen);
 
-		g_so_sen_initialized = true;
+			read_raw = 0;
+
+			xTaskCreatePinnedToCore(&so_sen_task, "so_sen_task", SO_SEN_STACK_SIZE, NULL, SO_SEN_PRIORITY, NULL, SO_SEN_CORE_ID);
+
+			g_so_sen_initialized = true;
+		}
+		else{
+			ESP_LOGE(TAG, "Error, SO-SEN recollecter hasn't been registered");
+		}
 	}
 }
 
