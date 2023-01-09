@@ -166,13 +166,23 @@ void dht22_init(void){
 		ESP_LOGE(TAG,"Failed to initialize the DHT22 mutex");
 	}
 	else{
+		int res;
 
-		humidity = 0;
-		temperature = 0;
+		res = register_recollecter(&dht22_get_sensor_data);
 
-		xTaskCreatePinnedToCore(&dht22_task, "dht22_task", DHT22_STACK_SIZE, NULL, DHT22_PRIORITY, NULL, DHT22_CORE_ID);
+		if(res == 1){
+			ESP_LOGI(TAG, "DHT22 recollecter successfully registered");
+			
+			humidity = 0;
+			temperature = 0;
 
-		g_dht22_initialized = true;
+			xTaskCreatePinnedToCore(&dht22_task, "dht22_task", DHT22_STACK_SIZE, NULL, DHT22_PRIORITY, NULL, DHT22_CORE_ID);
+
+			g_dht22_initialized = true;
+		}
+		else{
+			ESP_LOGE(TAG, "Error, DHT22 recollecter hasn't been registered");
+		}
 	}
 
 }
