@@ -92,167 +92,234 @@ static void lcd_send_data(char data){
 
 static void lcd_task(void *pvParameters){
 
-	int sensor_id_to_show = 0;
 	int fr_size, sr_size, move_n;
 	sensor_data_t aux;
 	char number[12];
 
 	for(;;){
 
-		aux = get_sensor_data(sensor_id_to_show);
+		// [First] show the status info
 
-		if(aux.valuesLen != 0){
+		aux = get_sensor_data(0);
 
-			lcd_clear();
+		lcd_clear();
 
-			// First row (Sensor name + Third value) -> Each one will take 20 spaces at max
+		char ip[MAX_CHARAC_ROW/2];
+		char id[MAX_CHARAC_ROW/2];
+		char time[MAX_CHARAC_ROW/2];
+		char uptime[MAX_CHARAC_ROW/2];
+		memset(&ip, 0, MAX_CHARAC_ROW/2);
+		memset(&id, 0, MAX_CHARAC_ROW/2);
+		memset(&time, 0, MAX_CHARAC_ROW/2);
+		memset(&uptime, 0, MAX_CHARAC_ROW/2);
 
-			char sn[MAX_CHARAC_ROW/2];
-			char tv[MAX_CHARAC_ROW/2];
-			memset(&sn, 0, MAX_CHARAC_ROW/2);
-			memset(&tv, 0, MAX_CHARAC_ROW/2);
+		// IP
 
-			// Sensor name
-			strcat(sn, "[Name: ");								// 7 characters
-			strncat(sn, aux.sensorName, 12);					// 12 characters at max
-			strcat(sn, "]");									// 1 character
+		strcat(ip, "IP: ");										// 4 characters
+		strcat(ip, aux.sensor_values[0].sensor_value.cval);		// 15 characters at max
+		strcat(ip, " ");										// 1 characters
 
-			lcd_write(sn);
+		lcd_write(ip);
 
-			// Third value
-			if(aux.valuesLen >= 3){
-				lcd_set_cursor(0, 20);
+		// ID
 
-				strcat(tv, "[");								// 1 character
-				strncat(tv, aux.sensor_values[2].valueName, 4);	// 4 characters at max
-				strcat(tv, ": ");								// 2 characters
+		lcd_set_cursor(0, 20);
 
-				// 12 characters by all means
-				if(aux.sensor_values[2].sensor_value_type == INTEGER){
-					snprintf(number, 12, "%d", aux.sensor_values[2].sensor_value.ival);
-					strcat(tv, number);
-				}
-				else if(aux.sensor_values[2].sensor_value_type == FLOAT){
-					snprintf(number, 12, "%f", aux.sensor_values[2].sensor_value.fval);
-					strcat(tv, number);
-				}
-				else{
-					strncat(tv, aux.sensor_values[2].sensor_value.cval, 12);
-				}
+		strcat(id, "ID: ");										// 4 characters
+		strcat(id, aux.sensor_values[1].sensor_value.cval);		// 12 characters
 
-				strcat(tv, "]");								// 1 character
+		lcd_write(id);
 
-				lcd_write(tv);
-			}
+		// Time
 
-			// Second row (First value + Second value) -> Each one will take 20 spaces at max
+		lcd_set_cursor(1, 0);
 
-			char fv[MAX_CHARAC_ROW/2];
-			char sv[MAX_CHARAC_ROW/2];
-			memset(&fv, 0, MAX_CHARAC_ROW/2);
-			memset(&sv, 0, MAX_CHARAC_ROW/2);
+		strcat(time, "Time: ");									// 6 characters
+		strcat(time, aux.sensor_values[2].sensor_value.cval);	// 8 characters
+		strcat(time, " ");										// 1 characters
 
-			// First value
-			lcd_set_cursor(1, 0);
+		lcd_write(time);
 
-			strcat(fv, "[");									// 1 character
-			strncat(fv, aux.sensor_values[0].valueName, 4);		// 4 characters at max
-			strcat(fv, ": ");									// 2 characters
+		// Uptime
 
-			// 12 characters by all means
-			if(aux.sensor_values[0].sensor_value_type == INTEGER){
-				snprintf(number, 12, "%d", aux.sensor_values[0].sensor_value.ival);
-				strcat(fv, number);
-			}
-			else if(aux.sensor_values[0].sensor_value_type == FLOAT){
-				snprintf(number, 12, "%f", aux.sensor_values[0].sensor_value.fval);
-				strcat(fv, number);
-			}
-			else{
-				strncat(fv, aux.sensor_values[0].sensor_value.cval, 12);
-			}
+		lcd_set_cursor(1, 20);
 
-			strcat(fv, "]");									// 1 character
+		strcat(uptime, "Uptime: ");								// 8 characters
+		strcat(uptime, aux.sensor_values[3].sensor_value.cval);	// 9 characters
 
-			lcd_write(fv);
+		lcd_write(uptime);
 
-			// Second value
-			if(aux.valuesLen >= 2){
-				lcd_set_cursor(1, 20);
+		// Display movement
+		fr_size = 20 + strlen(id);
+		sr_size = 20 + strlen(uptime);
 
-				strcat(sv, "[");								// 1 character
-				strncat(sv, aux.sensor_values[1].valueName, 4);	// 4 characters at max
-				strcat(sv, ": ");								// 2 characters
-
-				// 12 characters by all means
-				if(aux.sensor_values[1].sensor_value_type == INTEGER){
-					snprintf(number, 12, "%d", aux.sensor_values[1].sensor_value.ival);
-					strcat(sv, number);
-				}
-				else if(aux.sensor_values[1].sensor_value_type == FLOAT){
-					snprintf(number, 12, "%f", aux.sensor_values[1].sensor_value.fval);
-					strcat(sv, number);
-				}
-				else{
-					strncat(sv, aux.sensor_values[1].sensor_value.cval, 12);
-				}
-
-				strcat(sv, "]");								// 1 character
-
-				lcd_write(sv);
-			}
-
-			// Display movement
-			if(aux.valuesLen >= 3){
-				fr_size = 20 + strlen(tv);
-				sr_size = 20 + strlen(sv);
-			}
-			else if(aux.valuesLen == 2){
-				fr_size = strlen(sn);
-				sr_size = 20 + strlen(sv);
-			}
-			else{
-				fr_size = strlen(sn);
-				sr_size = strlen(fv);
-			}
-
-			if(fr_size > sr_size){
-				move_n = fr_size - 16;
-			}
-			else{
-				move_n = sr_size - 16;
-			}
-
-			if(move_n > 0){
-				vTaskDelay(LCD_TIME_BEFORE_MOVE);
-
-				for(int i = 0; i < move_n; i++){
-					lcd_shift_display_left();
-					vTaskDelay(LCD_TIME_MOVE_FREC);
-				}
-			}
-
-			// Get ready for the next
-			if(sensor_id_to_show < get_recollecters_size() - 1)
-				sensor_id_to_show++;
-			else
-				sensor_id_to_show = 0;
-
-			vTaskDelay(LCD_TIME_TO_SHOW_NEXT);
+		if(fr_size > sr_size){
+			move_n = fr_size - 16;
 		}
 		else{
-			ESP_LOGE(TAG, "Error take place with the sensor that has ID %d", sensor_id_to_show);
-
-			vTaskDelay(LCD_TIME_WHEN_FAIL);
-
-			// Pass to the next one
-			if(sensor_id_to_show < get_recollecters_size() - 1)
-				sensor_id_to_show++;
-			else
-				sensor_id_to_show = 0;
+			move_n = sr_size - 16;
 		}
-		
+
+		if(move_n > 0){
+			vTaskDelay(LCD_TIME_BEFORE_MOVE);
+
+			for(int i = 0; i < move_n; i++){
+				lcd_shift_display_left();
+				vTaskDelay(LCD_TIME_MOVE_FREC);
+			}
+		}
+
 		free(aux.sensor_values);
+
+		vTaskDelay(LCD_TIME_TO_SHOW_NEXT);
+
+		// [Second] show the sensors info
+
+		for(int i = 1; i < get_recollecters_size(); i++){
+
+			aux = get_sensor_data(i);
+
+			if(aux.valuesLen != 0){
+
+				lcd_clear();
+
+				// First row (Sensor name + Third value) -> Each one will take 20 spaces at max
+
+				char sn[MAX_CHARAC_ROW/2];
+				char tv[MAX_CHARAC_ROW/2];
+				memset(&sn, 0, MAX_CHARAC_ROW/2);
+				memset(&tv, 0, MAX_CHARAC_ROW/2);
+
+				// Sensor name
+				strcat(sn, "[Name: ");								// 7 characters
+				strncat(sn, aux.sensorName, 12);					// 12 characters at max
+				strcat(sn, "]");									// 1 character
+
+				lcd_write(sn);
+
+				// Third value
+				if(aux.valuesLen >= 3){
+					lcd_set_cursor(0, 20);
+
+					strcat(tv, "[");								// 1 character
+					strncat(tv, aux.sensor_values[2].valueName, 4);	// 4 characters at max
+					strcat(tv, ": ");								// 2 characters
+
+					// 12 characters by all means
+					if(aux.sensor_values[2].sensor_value_type == INTEGER){
+						snprintf(number, 12, "%d", aux.sensor_values[2].sensor_value.ival);
+						strcat(tv, number);
+					}
+					else if(aux.sensor_values[2].sensor_value_type == FLOAT){
+						snprintf(number, 12, "%f", aux.sensor_values[2].sensor_value.fval);
+						strcat(tv, number);
+					}
+					else{
+						strncat(tv, aux.sensor_values[2].sensor_value.cval, 12);
+					}
+
+					strcat(tv, "]");								// 1 character
+
+					lcd_write(tv);
+				}
+
+				// Second row (First value + Second value) -> Each one will take 20 spaces at max
+
+				char fv[MAX_CHARAC_ROW/2];
+				char sv[MAX_CHARAC_ROW/2];
+				memset(&fv, 0, MAX_CHARAC_ROW/2);
+				memset(&sv, 0, MAX_CHARAC_ROW/2);
+
+				// First value
+				lcd_set_cursor(1, 0);
+
+				strcat(fv, "[");									// 1 character
+				strncat(fv, aux.sensor_values[0].valueName, 4);		// 4 characters at max
+				strcat(fv, ": ");									// 2 characters
+
+				// 12 characters by all means
+				if(aux.sensor_values[0].sensor_value_type == INTEGER){
+					snprintf(number, 12, "%d", aux.sensor_values[0].sensor_value.ival);
+					strcat(fv, number);
+				}
+				else if(aux.sensor_values[0].sensor_value_type == FLOAT){
+					snprintf(number, 12, "%f", aux.sensor_values[0].sensor_value.fval);
+					strcat(fv, number);
+				}
+				else{
+					strncat(fv, aux.sensor_values[0].sensor_value.cval, 12);
+				}
+
+				strcat(fv, "]");									// 1 character
+
+				lcd_write(fv);
+
+				// Second value
+				if(aux.valuesLen >= 2){
+					lcd_set_cursor(1, 20);
+
+					strcat(sv, "[");								// 1 character
+					strncat(sv, aux.sensor_values[1].valueName, 4);	// 4 characters at max
+					strcat(sv, ": ");								// 2 characters
+
+					// 12 characters by all means
+					if(aux.sensor_values[1].sensor_value_type == INTEGER){
+						snprintf(number, 12, "%d", aux.sensor_values[1].sensor_value.ival);
+						strcat(sv, number);
+					}
+					else if(aux.sensor_values[1].sensor_value_type == FLOAT){
+						snprintf(number, 12, "%f", aux.sensor_values[1].sensor_value.fval);
+						strcat(sv, number);
+					}
+					else{
+						strncat(sv, aux.sensor_values[1].sensor_value.cval, 12);
+					}
+
+					strcat(sv, "]");								// 1 character
+
+					lcd_write(sv);
+				}
+
+				// Display movement
+				if(aux.valuesLen >= 3){
+					fr_size = 20 + strlen(tv);
+					sr_size = 20 + strlen(sv);
+				}
+				else if(aux.valuesLen == 2){
+					fr_size = strlen(sn);
+					sr_size = 20 + strlen(sv);
+				}
+				else{
+					fr_size = strlen(sn);
+					sr_size = strlen(fv);
+				}
+
+				if(fr_size > sr_size){
+					move_n = fr_size - 16;
+				}
+				else{
+					move_n = sr_size - 16;
+				}
+
+				if(move_n > 0){
+					vTaskDelay(LCD_TIME_BEFORE_MOVE);
+
+					for(int i = 0; i < move_n; i++){
+						lcd_shift_display_left();
+						vTaskDelay(LCD_TIME_MOVE_FREC);
+					}
+				}
+
+				vTaskDelay(LCD_TIME_TO_SHOW_NEXT);
+			}
+			else{
+				ESP_LOGE(TAG, "Error take place with the sensor that has ID %d", i);
+
+				vTaskDelay(LCD_TIME_WHEN_FAIL);
+			}
+
+			free(aux.sensor_values);
+		}
 	}
 }
 
