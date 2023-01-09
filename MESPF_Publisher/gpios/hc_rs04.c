@@ -103,45 +103,56 @@ void hc_rs04_init(void){
 		ESP_LOGE(TAG,"Failed to initialize the HC_RS04 mutex");
 	}
 	else{
-	    // Create the queue
-	    cap_queue = xQueueCreate(1, sizeof(uint32_t));
+		int res;
 
-	    if (cap_queue == NULL) {
-	        ESP_LOGE(TAG, "Failed creating the message queue");
-	    }
-	    else{
-			water_level_percentage = 0;
+		res = register_recollecter(&hc_rs04_get_sensor_data);
 
-			// Set echo pin
-			mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM_CAP_0, HC_RS04_ECHO_GPIO);
-			gpio_pulldown_en(HC_RS04_ECHO_GPIO);
+		if(res == 1){
+			ESP_LOGI(TAG, "HC_RS04 recollecter successfully registered");
 
-		    mcpwm_capture_config_t conf = {
-		        .cap_edge = MCPWM_BOTH_EDGE,
-		        .cap_prescale = 1,
-		        .capture_cb = hc_rs04_echo_isr_handler,
-		        .user_data = NULL
-		    };
+		    // Create the queue
+		    cap_queue = xQueueCreate(1, sizeof(uint32_t));
 
-		    mcpwm_capture_enable_channel(MCPWM_UNIT_0, MCPWM_SELECT_CAP0, &conf);
+		    if (cap_queue == NULL) {
+		        ESP_LOGE(TAG, "Failed creating the message queue");
+		    }
+		    else{
+				water_level_percentage = 0;
 
-			// Set trig pin
-		    gpio_config_t io_conf = {
-		        .intr_type = GPIO_INTR_DISABLE,
-		        .mode = GPIO_MODE_OUTPUT,
-		        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-		        .pull_up_en = GPIO_PULLUP_DISABLE,
-		        .pin_bit_mask = BIT64(HC_RS04_TRIG_GPIO),
-		    };
+				// Set echo pin
+				mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM_CAP_0, HC_RS04_ECHO_GPIO);
+				gpio_pulldown_en(HC_RS04_ECHO_GPIO);
 
-		    gpio_config(&io_conf);
-		    gpio_set_level(HC_RS04_TRIG_GPIO, 0);
+			    mcpwm_capture_config_t conf = {
+			        .cap_edge = MCPWM_BOTH_EDGE,
+			        .cap_prescale = 1,
+			        .capture_cb = hc_rs04_echo_isr_handler,
+			        .user_data = NULL
+			    };
+
+			    mcpwm_capture_enable_channel(MCPWM_UNIT_0, MCPWM_SELECT_CAP0, &conf);
+
+				// Set trig pin
+			    gpio_config_t io_conf = {
+			        .intr_type = GPIO_INTR_DISABLE,
+			        .mode = GPIO_MODE_OUTPUT,
+			        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+			        .pull_up_en = GPIO_PULLUP_DISABLE,
+			        .pin_bit_mask = BIT64(HC_RS04_TRIG_GPIO),
+			    };
+
+			    gpio_config(&io_conf);
+			    gpio_set_level(HC_RS04_TRIG_GPIO, 0);
 
 
-			xTaskCreatePinnedToCore(&hc_rs04_task, "hc_rs04_task", HC_RS04_STACK_SIZE, NULL, HC_RS04_PRIORITY, NULL, HC_RS04_CORE_ID);
+				xTaskCreatePinnedToCore(&hc_rs04_task, "hc_rs04_task", HC_RS04_STACK_SIZE, NULL, HC_RS04_PRIORITY, NULL, HC_RS04_CORE_ID);
 
-			g_hc_rs04_initialized = true;
-	    }
+				g_hc_rs04_initialized = true;
+		    }
+		}
+		else{
+			ESP_LOGE(TAG, "Error, HC_RS04 recollecter hasn't been registered");
+		}
 	}
 }
 
