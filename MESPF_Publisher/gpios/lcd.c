@@ -179,7 +179,7 @@ static void lcd_task(void *pvParameters){
 
 			aux = get_sensor_data(i);
 
-			if(aux.valuesLen != 0){
+			if(aux.valuesLen != 0 && aux.showOnLCD == true){
 
 				lcd_clear();
 
@@ -312,7 +312,7 @@ static void lcd_task(void *pvParameters){
 
 				vTaskDelay(LCD_TIME_TO_SHOW_NEXT);
 			}
-			else{
+			else if(aux.valuesLen == 0){
 				ESP_LOGE(TAG, "Error take place with the sensor that has ID %d", i);
 
 				vTaskDelay(LCD_TIME_WHEN_FAIL);
