@@ -18,7 +18,7 @@ static const char TAG[] = "so_sen";
 
 bool g_so_sen_initialized = false;
 
-static int read_raw;
+static float soil_moisture_percentage;
 
 static pthread_mutex_t mutex_so_sen;
 
@@ -28,7 +28,7 @@ static pthread_mutex_t mutex_so_sen;
 
 static void so_sen_task(void *pvParameters){
 
-	int auxRead_raw;
+	int auxRead_raw, read_raw;
 
 	for(;;){
 
@@ -41,6 +41,8 @@ static void so_sen_task(void *pvParameters){
         }
 
         read_raw = auxRead_raw / N_SAMPLES;
+
+        soil_moisture_percentage = (((float)SO_SEN_LOW_V - (float)read_raw) / ((float)SO_SEN_LOW_V - (float)SO_SEN_HIGH_V)) * 100;
 
         pthread_mutex_unlock(&mutex_so_sen);
 
@@ -64,7 +66,7 @@ void so_sen_init(void){
 			adc1_config_width(width_so_sen);
 			adc1_config_channel_atten(channel_so_sen, atten_so_sen);
 
-			read_raw = 0;
+			soil_moisture_percentage = 0.0;
 
 			xTaskCreatePinnedToCore(&so_sen_task, "so_sen_task", SO_SEN_STACK_SIZE, NULL, SO_SEN_PRIORITY, NULL, SO_SEN_CORE_ID);
 
@@ -97,9 +99,9 @@ sensor_data_t so_sen_get_sensor_data(void){
 	aux.sensor_values = aux2;
 
 	strcpy(aux.sensor_values[0].valueName,"Soil moisture");
-	aux.sensor_values[0].sensor_value_type = INTEGER;
-	aux.sensor_values[0].sensor_value.ival = read_raw;
-	
+	aux.sensor_values[0].sensor_value_type = FLOAT;
+	aux.sensor_values[0].sensor_value.fval = soil_moisture_percentage;
+
 	aux.showOnLCD = SO_SEN_SHOW_ON_LCD;
 
 	pthread_mutex_unlock(&mutex_so_sen);
