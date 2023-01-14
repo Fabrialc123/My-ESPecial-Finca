@@ -36,6 +36,7 @@ typedef struct {
 	char sensorName[CHAR_LENGTH];
 	int valuesLen;
 	sensor_value_t *sensor_values;
+	bool showOnLCD;
 }sensor_data_t;
 
 
