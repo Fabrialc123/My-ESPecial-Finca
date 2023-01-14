@@ -99,6 +99,8 @@ sensor_data_t mq2_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"S/G");
 	aux.sensor_values[0].sensor_value_type = INTEGER;
 	aux.sensor_values[0].sensor_value.ival = read_raw;
+	
+	aux.showOnLCD = MQ2_SHOW_ON_LCD;
 
 	pthread_mutex_unlock(&mutex_mq2);
 
