@@ -215,6 +215,8 @@ sensor_data_t dht22_get_sensor_data(void){
 	aux.sensor_values[1].sensor_value_type = FLOAT;
 	aux.sensor_values[1].sensor_value.fval = temperature;
 	
+	aux.showOnLCD = DHT22_SHOW_ON_LCD;
+	
 	pthread_mutex_unlock(&mutex_dht22);
 
 	return aux;
