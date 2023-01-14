@@ -18,7 +18,7 @@ static const char TAG[] = "mq2";
 
 bool g_mq2_initialized 	= false;
 
-static int read_raw;
+static float smoke_gas_percentage;
 
 static pthread_mutex_t mutex_mq2;
 
@@ -28,7 +28,7 @@ static pthread_mutex_t mutex_mq2;
 
 static void mq2_task(void *pvParameters){
 
-	int auxRead_raw;
+	int auxRead_raw, read_raw;
 
 	for(;;){
 
@@ -41,6 +41,8 @@ static void mq2_task(void *pvParameters){
         }
 
         read_raw = auxRead_raw / N_SAMPLES;
+
+        smoke_gas_percentage = (((float)read_raw - (float)MQ2_LOW_V) / ((float)MQ2_HIGH_V - (float)MQ2_LOW_V)) * 100;
 
         pthread_mutex_unlock(&mutex_mq2);
 
@@ -64,7 +66,7 @@ void mq2_init(void){
 			adc1_config_width(width_mq2);
 			adc1_config_channel_atten(channel_mq2, atten_mq2);
 
-			read_raw = 0;
+			smoke_gas_percentage = 0.0;
 
 			xTaskCreatePinnedToCore(&mq2_task, "mq2_task", MQ2_STACK_SIZE, NULL, MQ2_PRIORITY, NULL, MQ2_CORE_ID);
 
@@ -97,9 +99,9 @@ sensor_data_t mq2_get_sensor_data(void){
 	aux.sensor_values = aux2;
 
 	strcpy(aux.sensor_values[0].valueName,"S/G");
-	aux.sensor_values[0].sensor_value_type = INTEGER;
-	aux.sensor_values[0].sensor_value.ival = read_raw;
-	
+	aux.sensor_values[0].sensor_value_type = FLOAT;
+	aux.sensor_values[0].sensor_value.fval = smoke_gas_percentage;
+
 	aux.showOnLCD = MQ2_SHOW_ON_LCD;
 
 	pthread_mutex_unlock(&mutex_mq2);
