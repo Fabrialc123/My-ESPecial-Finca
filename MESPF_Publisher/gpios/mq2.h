@@ -11,6 +11,10 @@
 #include "driver/adc.h"
 #include "recollecter.h"
 
+#define MQ2_LOW_V		1000
+
+#define MQ2_HIGH_V		4095
+
 #define N_SAMPLES   	64          						//Used for minimizing noise
 
 static const adc1_channel_t channel_mq2 = ADC1_CHANNEL_6;     	//ADC1 channel 6 -> GPIO34
