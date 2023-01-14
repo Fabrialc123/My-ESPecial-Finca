@@ -179,6 +179,8 @@ sensor_data_t hc_rs04_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"Water level");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = water_level_percentage;
+	
+	aux.showOnLCD = HC_RS04_SHOW_ON_LCD;
 
 	pthread_mutex_unlock(&mutex_hc_rs04);
 
