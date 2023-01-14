@@ -11,6 +11,10 @@
 #include "driver/adc.h"
 #include "recollecter.h"
 
+#define SO_SEN_LOW_V	4095
+
+#define SO_SEN_HIGH_V	1700
+
 #define N_SAMPLES   	64          						//Used for minimizing noise
 
 static const adc1_channel_t channel_so_sen = ADC1_CHANNEL_7;     	//ADC1 channel 7 -> GPIO35
