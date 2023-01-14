@@ -99,6 +99,8 @@ sensor_data_t so_sen_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"Soil moisture");
 	aux.sensor_values[0].sensor_value_type = INTEGER;
 	aux.sensor_values[0].sensor_value.ival = read_raw;
+	
+	aux.showOnLCD = SO_SEN_SHOW_ON_LCD;
 
 	pthread_mutex_unlock(&mutex_so_sen);
 
