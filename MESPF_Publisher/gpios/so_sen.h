@@ -19,6 +19,8 @@ static const adc_atten_t atten_so_sen = ADC_ATTEN_DB_11;
 
 #define SO_SEN_TIME_TO_UPDATE_DATA	100 * 5 				// 1 second = 100 ticks
 
+#define SO_SEN_SHOW_ON_LCD	true
+
 /*
  * Initializes SO_SEN peripheral
  */
