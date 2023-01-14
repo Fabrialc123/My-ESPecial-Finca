@@ -52,6 +52,8 @@
 
 #define DHT22_TIME_TO_UPDATE_DATA	100 * 5 // 1 second = 100 ticks
 
+#define DHT22_SHOW_ON_LCD			true
+
 /*
  * Initializes DTH22 peripheral
  */
