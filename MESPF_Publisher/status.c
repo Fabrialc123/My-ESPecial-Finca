@@ -24,7 +24,7 @@ static pthread_mutex_t mutex_STATUS;
 
 void status_start(){
 	struct tm timeInfo;
-	//struct timeval tv_now;
+	struct timeval tv_now;
 	char strftime_buf[64];
 
 	if(pthread_mutex_init (&mutex_STATUS, NULL) != 0){
@@ -35,7 +35,7 @@ void status_start(){
 	setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
 	tzset();
 
-	/*if(rtc_initialize()){
+	if(rtc_initialize()){
 		rtc_getDateTime(&timeInfo);
 		timeInfo.tm_hour += 1;
 		start = mktime(&timeInfo);
@@ -44,7 +44,7 @@ void status_start(){
 		settimeofday(&tv_now, NULL);
 	}else {
 		ESP_LOGE(TAG2, "rtc_initialize failed! Can't update time");
-	}*/
+	}
 
 	time(&start);
 	localtime_r(&start, &timeInfo);
