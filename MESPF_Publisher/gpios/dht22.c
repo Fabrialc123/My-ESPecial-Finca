@@ -172,7 +172,7 @@ void dht22_init(void){
 
 		if(res == 1){
 			ESP_LOGI(TAG, "DHT22 recollecter successfully registered");
-			
+
 			humidity = 0;
 			temperature = 0;
 
@@ -184,7 +184,6 @@ void dht22_init(void){
 			ESP_LOGE(TAG, "Error, DHT22 recollecter hasn't been registered");
 		}
 	}
-
 }
 
 sensor_data_t dht22_get_sensor_data(void){
@@ -207,16 +206,16 @@ sensor_data_t dht22_get_sensor_data(void){
 	aux.valuesLen = number_of_values;
 	aux.sensor_values = aux2;
 
+	aux.sensor_values[0].showOnLCD = DHT22_SHOW_HUMIDITY_ON_LCD;
 	strcpy(aux.sensor_values[0].valueName,"Humidity");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = humidity;
 
+	aux.sensor_values[1].showOnLCD = DHT22_SHOW_TEMPERATURE_ON_LCD;
 	strcpy(aux.sensor_values[1].valueName,"Temperature");
 	aux.sensor_values[1].sensor_value_type = FLOAT;
 	aux.sensor_values[1].sensor_value.fval = temperature;
-	
-	aux.showOnLCD = DHT22_SHOW_ON_LCD;
-	
+
 	pthread_mutex_unlock(&mutex_dht22);
 
 	return aux;
