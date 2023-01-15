@@ -27,6 +27,7 @@ union sensor_value_u{
 } ;
 
 typedef struct {
+	bool showOnLCD;
 	char valueName[CHAR_LENGTH];
 	sensor_value_type_e sensor_value_type;
 	union sensor_value_u sensor_value;
@@ -36,7 +37,6 @@ typedef struct {
 	char sensorName[CHAR_LENGTH];
 	int valuesLen;
 	sensor_value_t *sensor_values;
-	bool showOnLCD;
 }sensor_data_t;
 
 
