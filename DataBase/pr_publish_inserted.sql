@@ -6,14 +6,19 @@ DECLARE topic_aux VARCHAR(128);
 DECLARE data_in VARCHAR(255);
 DECLARE id_esp32 VARCHAR(30);
 DECLARE id_sensor VARCHAR(20);
-DECLARE num_sensor INT;	DECLARE tm TIMESTAMP;
-DECLARE m_arg_1 VARCHAR(20);	DECLARE m_arg_2 VARCHAR(20);	DECLARE m_arg_3 VARCHAR(20);	DECLARE m_arg_4 VARCHAR(20);
-DECLARE m_id_alert int; 	DECLARE m_descr VARCHAR(128);
+DECLARE num_sensor INT;	
+DECLARE tm TIMESTAMP;
+DECLARE m_arg_1 VARCHAR(20);	
+DECLARE m_arg_2 VARCHAR(20);	
+DECLARE m_arg_3 VARCHAR(20);	
+DECLARE m_arg_4 VARCHAR(20);
+DECLARE m_id_alert int; 	
+DECLARE m_descr VARCHAR(128);
 
 DECLARE EXIT HANDLER FOR SQLEXCEPTION 
 BEGIN 
 	UPDATE publish set error = 1 where cod_publish = m_cod_publish;
-SELECT 'ERROR!';
+	SELECT 'ERROR!';
 END;
 
 SET  str_aux = substring(topic, 12); -- MESPF/SENS/
@@ -43,12 +48,19 @@ if (str_aux like 'INFO') then
 	select m_arg_1,m_arg_2,m_arg_3,m_arg_4 ;
 	INSERT INTO info(id_esp32,id_sensor,num_sensor,arg_1,arg_2,arg_3,arg_4,dt_info,cod_publish)
 	VALUES (id_esp32,id_sensor, num_sensor, m_arg_1, m_arg_2, m_arg_3, m_arg_4, tm, m_cod_publish);
-else if (str_aux like 'ALERT') then
+elseif (str_aux like 'ALERT') then
 	SET m_id_alert = JSON_UNQUOTE(JSON_EXTRACT(data_in,'$.ID'));
 	SET m_descr = JSON_UNQUOTE(JSON_EXTRACT(data_in,'$.DESC'));
 	SELECT m_id_alert, m_descr;
 	INSERT INTO alert(id_esp32,id_sensor,num_sensor,id_alert,descr,dt_info,cod_publish)
 	VALUES (id_esp32,id_sensor, num_sensor, m_id_alert,m_descr, tm, m_cod_publish);
-else 
+else
+	SELECT 'Error! Not supported topic!', topic;
+	UPDATE publish set error = 1 where cod_publish = m_cod_publish;
 end if;
-END; //
+
+UPDATE publish set processed = 1 where cod_publish = m_cod_publish;
+SELECT 'OK!';
+
+END;
+//
