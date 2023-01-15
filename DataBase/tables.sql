@@ -2,19 +2,25 @@ CREATE TABLE publish (
   cod_publish INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
   message VARCHAR(200),
   topic VARCHAR(128),
-  dt_publish TIMESTAMP DEFAULT SYSDATE(),
-  processed BOOLEAN NOT NULL DEFAULT 0,
-  error BOOLEAN NOT NULL DEFAULT 0
+  dt_publish TIMESTAMP DEFAULT SYSDATE()
+);
+
+CREATE TABLE publish_processed (
+	cod_publish INT NOT NULL,
+	processed BOOLEAN NOT NULL DEFAULT FALSE,
+	error BOOLEAN NOT NULL DEFAULT FALSE,
+	CONSTRAINT FK_publish_processed_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish) ON DELETE CASCADE
 );
 
 CREATE TABLE esp32 (
-  id VARCHAR(30) NOT NULL,
+  id_esp32 VARCHAR(30) NOT NULL,
   dt_begin TIMESTAMP NOT NULL,
   cod_publish_begin INT NOT NULL,
   dt_end TIMESTAMP,
   cod_publish_end INT,
-  CONSTRAINT FK_esp32_cod_publish_begin FOREIGN KEY (cod_publish_begin) REFERENCES publish(cod_publish),
-  CONSTRAINT FK_esp32_cod_publish_end FOREIGN KEY (cod_publish_end) REFERENCES publish(cod_publish)
+  ended BOOLEAN DEFAULT FALSE,
+  CONSTRAINT FK_esp32_cod_publish_begin FOREIGN KEY (cod_publish_begin) REFERENCES publish(cod_publish) ON DELETE CASCADE,
+  CONSTRAINT FK_esp32_cod_publish_end FOREIGN KEY (cod_publish_end) REFERENCES publish(cod_publish) ON DELETE CASCADE
 );
 
 CREATE TABLE info (
@@ -28,7 +34,7 @@ CREATE TABLE info (
   arg_4 VARCHAR(20),
   dt_info TIMESTAMP,
   cod_publish INT NOT NULL,
-  CONSTRAINT FK_info_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish)
+  CONSTRAINT FK_info_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish) ON DELETE CASCADE
 );
 
 CREATE TABLE alert(
@@ -40,5 +46,7 @@ CREATE TABLE alert(
   descr VARCHAR(128),
   dt_info TIMESTAMP,
   cod_publish INT NOT NULL,
-  CONSTRAINT FK_alert_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish)
+  CONSTRAINT FK_alert_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish) ON DELETE CASCADE
 );
+//
+
