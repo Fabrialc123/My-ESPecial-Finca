@@ -98,11 +98,10 @@ sensor_data_t so_sen_get_sensor_data(void){
 	aux.valuesLen = number_of_values;
 	aux.sensor_values = aux2;
 
+	aux.sensor_values[0].showOnLCD = SO_SEN_SHOW_MOISTURE_PERCENTAGE_ON_LCD;
 	strcpy(aux.sensor_values[0].valueName,"Soil moisture");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = soil_moisture_percentage;
-
-	aux.showOnLCD = SO_SEN_SHOW_ON_LCD;
 
 	pthread_mutex_unlock(&mutex_so_sen);
 
