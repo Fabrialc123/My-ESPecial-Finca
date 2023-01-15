@@ -24,7 +24,7 @@ static pthread_mutex_t mutex_STATUS;
 
 void status_start(){
 	struct tm timeInfo;
-	struct timeval tv_now;
+	//struct timeval tv_now;
 	char strftime_buf[64];
 
 	if(pthread_mutex_init (&mutex_STATUS, NULL) != 0){
@@ -35,7 +35,7 @@ void status_start(){
 	setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
 	tzset();
 
-	if(rtc_initialize()){
+	/*if(rtc_initialize()){
 		rtc_getDateTime(&timeInfo);
 		timeInfo.tm_hour += 1;
 		start = mktime(&timeInfo);
@@ -44,7 +44,7 @@ void status_start(){
 		settimeofday(&tv_now, NULL);
 	}else {
 		ESP_LOGE(TAG2, "rtc_initialize failed! Can't update time");
-	}
+	}*/
 
 	time(&start);
 	localtime_r(&start, &timeInfo);
@@ -156,8 +156,8 @@ sensor_data_t status_recollecter (void){
 	myID = (char*)malloc(sizeof(char)*MQTT_APP_MAX_TOPIC_LENGTH);
 	memset(myID,0,MQTT_APP_MAX_TOPIC_LENGTH);
 
-	tm = (char*)malloc(sizeof(char)*15);
-	memset(tm,0,15);
+	tm = (char*)malloc(sizeof(char)*20);
+	memset(tm,0,20);
 
 	utm = (char*)malloc(sizeof(char)*15);
 	memset(utm,0,15);
@@ -165,7 +165,7 @@ sensor_data_t status_recollecter (void){
 
 	wifi_app_getIP(myIP);
 	mqtt_app_getID(myID);
-	status_getTime(tm);
+	status_getDateTime(tm);
 	status_getUpTime(utm);
 
 
@@ -175,18 +175,23 @@ sensor_data_t status_recollecter (void){
 	strcpy(aux.sensorName, "STATUS");
 	aux.valuesLen = number_of_values;
 	aux.sensor_values = aux2;
+
+	aux.sensor_values[0].showOnLCD = STATUS_SHOW_IP_ON_LCD;
 	aux.sensor_values[0].sensor_value_type = STRING;
 	strcpy(aux.sensor_values[0].valueName,"IP");
 	strcpy(aux.sensor_values[0].sensor_value.cval, myIP);
 
+	aux.sensor_values[1].showOnLCD = STATUS_SHOW_ID_ON_LCD;
 	aux.sensor_values[1].sensor_value_type = STRING;
 	strcpy(aux.sensor_values[1].valueName,"ID");
 	strcpy(aux.sensor_values[1].sensor_value.cval, myID);
 
+	aux.sensor_values[2].showOnLCD = STATUS_SHOW_DATE_ON_LCD;
 	aux.sensor_values[2].sensor_value_type = STRING;
 	strcpy(aux.sensor_values[2].valueName,"TM");
 	strcpy(aux.sensor_values[2].sensor_value.cval, tm);
 
+	aux.sensor_values[3].showOnLCD = STATUS_SHOW_UPTIME_ON_LCD;
 	aux.sensor_values[3].sensor_value_type = STRING;
 	strcpy(aux.sensor_values[3].valueName,"UT");
 	strcpy(aux.sensor_values[3].sensor_value.cval, utm);
