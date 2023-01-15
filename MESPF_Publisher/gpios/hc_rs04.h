@@ -22,7 +22,7 @@
 
 #define HC_RS04_TIME_TO_UPDATE_DATA			100 * 5 	// 1 second = 100 ticks
 
-#define HC_RS04_SHOW_ON_LCD					true
+#define HC_RS04_SHOW_WATER_LEVEL_ON_LCD		true
 
 /*
  * Initializes HC_RS04 peripheral
