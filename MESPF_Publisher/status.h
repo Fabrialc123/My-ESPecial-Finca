@@ -10,6 +10,11 @@
 
 #include "esp_netif.h"
 
+#define STATUS_SHOW_IP_ON_LCD		true
+#define STATUS_SHOW_ID_ON_LCD		true
+#define STATUS_SHOW_DATE_ON_LCD		true
+#define STATUS_SHOW_UPTIME_ON_LCD	false
+
 void status_start();
 
 bool status_getDateTime(char *dt);
