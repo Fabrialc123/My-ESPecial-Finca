@@ -13,6 +13,7 @@
 #include <time.h>
 #include "esp_log.h"
 #include <string.h>
+#include <esp_sntp.h>
 
 
 static const char TAG2[] = "STATUS";
@@ -22,9 +23,29 @@ double upTimeAGG = 0;
 
 static pthread_mutex_t mutex_STATUS;
 
+static void initialize_sntp(void)
+{
+    ESP_LOGI(TAG2, "Initializing SNTP");
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    //sntp_setservername(0, "192.168.3.51");
+    sntp_setservername(0, NTP_SERVERNAME);
+    //sntp_setservername(0, "pool.ntp.org");
+    //sntp_set_time_sync_notification_cb(time_sync_notification_cb);
+    sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
+    //sntp_set_sync_interval(1*3600*1000);
+    sntp_set_sync_interval(NTP_SECSTOSYNC*1000);
+
+    sntp_init();
+
+    vTaskDelay(200);
+    while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
+        ESP_LOGI(TAG2, "Waiting for system time to be set...");
+        vTaskDelay(200);
+    }
+}
+
 void status_start(){
 	struct tm timeInfo;
-	struct timeval tv_now;
 	char strftime_buf[64];
 
 	if(pthread_mutex_init (&mutex_STATUS, NULL) != 0){
@@ -35,6 +56,7 @@ void status_start(){
 	setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
 	tzset();
 
+	/*
 	if(rtc_initialize()){
 		rtc_getDateTime(&timeInfo);
 		timeInfo.tm_hour += 1;
@@ -45,6 +67,9 @@ void status_start(){
 	}else {
 		ESP_LOGE(TAG2, "rtc_initialize failed! Can't update time");
 	}
+	*/
+
+	initialize_sntp();
 
 	time(&start);
 	localtime_r(&start, &timeInfo);
@@ -204,6 +229,3 @@ sensor_data_t status_recollecter (void){
 
 	return aux;
 }
-
-
-

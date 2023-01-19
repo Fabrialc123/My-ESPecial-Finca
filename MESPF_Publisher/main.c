@@ -12,8 +12,12 @@
 #include "http_server.h"
 #include "esp_log.h"
 #include "recollecter.h"
+#include "status.h"
+
+#include "time.h"
 
 #include "tests.c"
+#include "test_sntp.c"
 
 
 static const char main_TAG[] = "MAIN";
@@ -33,16 +37,13 @@ void app_main(void)
     ESP_LOGI(main_TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
     ESP_LOGI(main_TAG, "[APP] IDF version: %s", esp_get_idf_version());
 
-	wifi_app_start();
 
-	mqtt_app_start();
+	wifi_app_start();
 
 	recollecter_start();
 
+	status_start();
 
-	TEST_recollecter_register_recollecter();
-	//TEST_mqtt_app_send_alert();			// WARNING: INFINITE LOOP
-	//TEST_mqtt_app_refresh();
-
+	mqtt_app_start();
 }
 

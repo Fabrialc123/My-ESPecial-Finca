@@ -15,6 +15,9 @@
 #define STATUS_SHOW_DATE_ON_LCD		true
 #define STATUS_SHOW_UPTIME_ON_LCD	false
 
+#define NTP_SERVERNAME	"192.168.0.10"
+#define NTP_SECSTOSYNC	3600
+
 void status_start();
 
 bool status_getDateTime(char *dt);
