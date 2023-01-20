@@ -31,11 +31,11 @@ Ejemplo de STATUS:
 
 
 DHT22
-- Nivel de Humedad en ambiente (Float 0.0 - 100.0)  
+- Nivel de Humedad en ambiente (%) (Float 0.0 - 100.0)  
 - Temperatura (Cº) (Float -inf - +inf) 
 
 MQ2
-- Nivel de concentración de partículas de gas o humo (INT 0 - Inf) (A CAMBIAR POR FLOAT de %)
+- Nivel de concentración de partículas de gas o humo (%) (FLOAT 0.0 - 100.0)
 
 HC-RS04
 - Nivel de agua (%) (Float 0.0 - 100.0)
