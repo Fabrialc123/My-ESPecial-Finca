@@ -34,7 +34,7 @@ CREATE TABLE info (
 	CONSTRAINT FK_info_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish) ON DELETE CASCADE
 );
 
-CREATE TABLE alert(
+CREATE TABLE alert (
 	cod_publish INT PRIMARY KEY,
 	id_esp32 VARCHAR(30) NOT NULL,
 	id_sensor VARCHAR(20) NOT NULL,
@@ -44,5 +44,10 @@ CREATE TABLE alert(
 	dt_info TIMESTAMP,
 	CONSTRAINT FK_alert_cod_publish FOREIGN KEY (cod_publish) REFERENCES publish(cod_publish) ON DELETE CASCADE
 );
+
+CREATE TABLE boot (
+	time_boot TIMESTAMP NOT NULL
+);
+
 //
 
