@@ -8,7 +8,7 @@
 #define	DB_SERVER	"localhost"
 #define	DB_USER		"root"
 #define	DB_PASS		"MESPF"
-#define	DB_DB		"mespfdb"	
+#define	DB_DB		"mespfdb"
 
 #define MQTT_QOS	0
 #define MQTT_BROKER	"localhost"
@@ -19,16 +19,19 @@ MYSQL *conn;
 
 bool db_connection_init(){
 	conn = mysql_init(NULL);
-	printf("Connecting to DataBase");
+
+	fprintf(stdout,"Reconnect option: 1");
+	mysql_options(conn,MYSQL_OPT_RECONNECT, 1);
+	fprintf(stdout,"Connecting to DataBase");
 	while(!mysql_real_connect(conn,DB_SERVER,DB_USER,DB_PASS, DB_DB, 0, NULL, 0)){
-		printf(".");
+		fprintf(stdout,".");
 	}
-	printf("\nConnected to the DataBase \n");
+	fprintf(stdout,"\nConnected to DataBase \n");
 
 	if (mysql_query(conn,"INSERT INTO boot VALUES (SYSDATE())")){
 		fprintf(stderr,"%s \n", mysql_error(conn));
 	}
-	
+
 	return true;
 }
 
@@ -77,7 +80,7 @@ void on_subscribe(struct mosquitto *mosq, void *obj, int mid, int qos_count, con
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
 	char *query;
-	printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
+	fprintf(stdout,"%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
 	query = malloc((strlen(msg->topic) + strlen((char*)msg->payload)) + 128);
 
 	memset(query,0,strlen(msg->topic)+strlen((char*)msg->payload) + 127);
@@ -88,11 +91,12 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 	strcat(query,msg->topic);
 	strcat(query,"\')");
 
+
 	if(mysql_query(conn,query)){
 		fprintf(stderr, "%s \n", mysql_error(conn));
 	}
 
-	free(query);  
+	free(query);
 }
 
 
@@ -114,14 +118,13 @@ int main(int argc, char *argv[])
 	mosquitto_subscribe_callback_set(mosq, on_subscribe);
 	mosquitto_message_callback_set(mosq, on_message);
 
-	printf("Connecting to MQTT Broker");
+	fprintf(stdout,"Connecting to MQTT Broker");
 	rc = mosquitto_connect(mosq, MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE);
 	while(rc != MOSQ_ERR_SUCCESS){
 		rc = mosquitto_connect(mosq, MQTT_BROKER,MQTT_PORT, MQTT_KEEPALIVE);
-		printf(".");
+		fprintf(stdout,".");
 	}
-	printf("\nConnected to MQTT Broker \n");
-	
+	fprintf(stdout,"\nConnected to MQTT Broker \n");
 	if (!db_connection_init()){
 	 	return -1;
 	}
