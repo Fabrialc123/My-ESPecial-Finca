@@ -18,10 +18,12 @@
 MYSQL *conn;
 
 bool db_connection_init(){
+	bool recon = 1;
 	conn = mysql_init(NULL);
 
-	fprintf(stdout,"Reconnect option: 1");
-	mysql_options(conn,MYSQL_OPT_RECONNECT, 1);
+	fprintf(stdout,"Reconnect option: %d \n",recon);
+	mysql_options(conn,MYSQL_OPT_RECONNECT, &recon);
+	
 	fprintf(stdout,"Connecting to DataBase");
 	while(!mysql_real_connect(conn,DB_SERVER,DB_USER,DB_PASS, DB_DB, 0, NULL, 0)){
 		fprintf(stdout,".");
