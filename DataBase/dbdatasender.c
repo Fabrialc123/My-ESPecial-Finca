@@ -93,7 +93,8 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 	strcat(query,msg->topic);
 	strcat(query,"\')");
 
-
+	mysql_ping(conn); // Reconnects if idle too long
+	
 	if(mysql_query(conn,query)){
 		fprintf(stderr, "%s \n", mysql_error(conn));
 	}
