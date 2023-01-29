@@ -37,11 +37,12 @@ static void initialize_sntp(void)
 
     sntp_init();
 
-    vTaskDelay(200);
+    ESP_LOGI(TAG2, "Waiting response from NTP Server...");
+    vTaskDelay(1000);
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
-        ESP_LOGI(TAG2, "Waiting for system time to be set...");
-        vTaskDelay(200);
+        vTaskDelay(500);
     }
+    ESP_LOGI(TAG2, "Received response from NTP Server!");
 }
 
 void status_start(){
@@ -55,19 +56,6 @@ void status_start(){
 	// Set timezone to Spain Standard Time
 	setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
 	tzset();
-
-	/*
-	if(rtc_initialize()){
-		rtc_getDateTime(&timeInfo);
-		timeInfo.tm_hour += 1;
-		start = mktime(&timeInfo);
-		tv_now.tv_sec = start;
-		tv_now.tv_usec = 0;
-		settimeofday(&tv_now, NULL);
-	}else {
-		ESP_LOGE(TAG2, "rtc_initialize failed! Can't update time");
-	}
-	*/
 
 	initialize_sntp();
 
