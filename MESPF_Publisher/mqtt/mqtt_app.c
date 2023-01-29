@@ -123,7 +123,7 @@ static void mqtt_app_disconnect(void){
 static void mqtt_app_data_sender (void *pvParameters){
 	 ESP_LOGE("MQTT_APP_DATA_SENDER","STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_DATA_SENDER_STACK_SIZE);
 	 ESP_LOGI("MQTT_APP_DATA_SENDER", "Sending data every %d seconds.", MQTT_APP_TIME_TO_SEND_DATA/100);
-	 vTaskDelay(MQTT_APP_TIME_TO_SEND_DATA);
+	 vTaskDelay(100);
 	 for(;;){
 		 ESP_LOGI("MQTT_APP_DATA_SENDER","Sending data...");
 		 mqtt_app_send_info(SENSORS_TOPIC);
@@ -248,6 +248,8 @@ static void mqtt_app_task(void *pvParameters){
         .uri = MQTT_APP_URI,
 #endif
 		.port = MQTT_APP_PORT,
+		.username = MQTT_USER,
+		.password = MQTT_PASSWD,
     };
 
     ESP_LOGE(TAG,"STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_TASK_STACK_SIZE);
