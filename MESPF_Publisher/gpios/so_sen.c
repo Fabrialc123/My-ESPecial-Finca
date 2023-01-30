@@ -13,6 +13,7 @@
 
 #include "esp_log.h"
 #include "string.h"
+#include "mqtt/mqtt_commands.h"
 
 static const char TAG[] = "so_sen";
 
@@ -30,6 +31,14 @@ static void so_sen_task(void *pvParameters){
 
 	int auxRead_raw, read_raw;
 
+	// Variables related to the alerts
+
+	int msg_id = 0;
+
+	int soil_moisture_percentage_alert_counter = 0;
+
+	bool soil_moisture_percentage_is_alerted = false;
+
 	for(;;){
 
 		pthread_mutex_lock(&mutex_so_sen);
@@ -43,6 +52,43 @@ static void so_sen_task(void *pvParameters){
         read_raw = auxRead_raw / N_SAMPLES;
 
         soil_moisture_percentage = (((float)SO_SEN_LOW_V - (float)read_raw) / ((float)SO_SEN_LOW_V - (float)SO_SEN_HIGH_V)) * 100;
+
+		// Moisture alert
+		if(SO_SEN_ALERT_MOISTURE){
+
+			// Update counter
+			if((soil_moisture_percentage < SO_SEN_MOISTURE_LOWER_THRESHOLD) && (soil_moisture_percentage_alert_counter > -SO_SEN_MOISTURE_TICKS_TO_ALERT))
+				soil_moisture_percentage_alert_counter--;
+			else if((soil_moisture_percentage > SO_SEN_MOISTURE_UPPER_THRESHOLD) && (soil_moisture_percentage_alert_counter < SO_SEN_MOISTURE_TICKS_TO_ALERT))
+				soil_moisture_percentage_alert_counter++;
+			else{
+				if(soil_moisture_percentage_alert_counter > 0)
+					soil_moisture_percentage_alert_counter--;
+				else if(soil_moisture_percentage_alert_counter < 0)
+					soil_moisture_percentage_alert_counter++;
+			}
+
+			// Check if the value can be alerted again
+			if((soil_moisture_percentage_alert_counter == 0) && soil_moisture_percentage_is_alerted){
+				soil_moisture_percentage_is_alerted = false;
+			}
+
+			// Check if it is the moment to alert
+			if((soil_moisture_percentage_alert_counter == -SO_SEN_MOISTURE_TICKS_TO_ALERT) && !soil_moisture_percentage_is_alerted){
+
+				mqtt_app_send_alert("SO_SEN", msg_id, "WARNING in Sensor SO_SEN! exceed on lower threshold (value: soil_moisture_percentage)");
+
+				soil_moisture_percentage_is_alerted = true;
+				msg_id++;
+			}
+			else if((soil_moisture_percentage_alert_counter == SO_SEN_MOISTURE_TICKS_TO_ALERT) && !soil_moisture_percentage_is_alerted){
+
+				mqtt_app_send_alert("SO_SEN", msg_id, "WARNING in Sensor SO_SEN! exceed on upper threshold (value: soil_moisture_percentage)");
+
+				soil_moisture_percentage_is_alerted = true;
+				msg_id++;
+			}
+		}
 
         pthread_mutex_unlock(&mutex_so_sen);
 
@@ -102,6 +148,8 @@ sensor_data_t so_sen_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"Soil moisture");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = soil_moisture_percentage;
+	aux.sensor_values[0].upper_threshold.fval = SO_SEN_MOISTURE_UPPER_THRESHOLD;
+	aux.sensor_values[0].lower_threshold.fval = SO_SEN_MOISTURE_LOWER_THRESHOLD;
 
 	pthread_mutex_unlock(&mutex_so_sen);
 
