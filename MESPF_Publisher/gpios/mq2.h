@@ -23,7 +23,16 @@ static const adc_atten_t atten_mq2 = ADC_ATTEN_DB_11;
 
 #define MQ2_TIME_TO_UPDATE_DATA	100 						// 1 second = 100 ticks
 
+// Value related to the LCD
+
 #define MQ2_SHOW_SMOKE_GAS_PERCENTAGE_ON_LCD	true
+
+// Values related to the alerts
+
+#define MQ2_ALERT_SMOKE_GAS						true
+#define MQ2_SMOKE_GAS_TICKS_TO_ALERT			3
+#define MQ2_SMOKE_GAS_UPPER_THRESHOLD			70.0
+#define MQ2_SMOKE_GAS_LOWER_THRESHOLD			0.0
 
 /*
  * Initializes MQ2 peripheral
