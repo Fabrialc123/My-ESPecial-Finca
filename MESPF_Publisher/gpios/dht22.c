@@ -15,6 +15,7 @@
 #include "esp_log.h"
 #include "string.h"
 #include "driver/gpio.h"
+#include "mqtt/mqtt_commands.h"
 
 static const char TAG[]  = "dht22";
 
@@ -63,6 +64,16 @@ static void dht22_task(void *pvParameters){
 
 	float auxHumidity;
 	float auxTemperature;
+
+	// Variables related to the alerts
+
+	int msg_id = 0;
+
+	int humidity_alert_counter = 0;
+	int temperature_alert_counter = 0;
+
+	bool humidity_is_alerted = false;
+	bool temperature_is_alerted = false;
 
 	for(;;){
 
@@ -154,6 +165,80 @@ static void dht22_task(void *pvParameters){
 			temperature = auxTemperature;
 		}
 
+		// Humidity alert
+		if(DHT22_ALERT_HUMIDITY){
+
+			// Update counter
+			if((humidity < DHT22_HUMIDITY_LOWER_THRESHOLD) && (humidity_alert_counter > -DHT22_HUMIDITY_TICKS_TO_ALERT))
+				humidity_alert_counter--;
+			else if((humidity > DHT22_HUMIDITY_UPPER_THRESHOLD) && (humidity_alert_counter < DHT22_HUMIDITY_TICKS_TO_ALERT))
+				humidity_alert_counter++;
+			else{
+				if(humidity_alert_counter > 0)
+					humidity_alert_counter--;
+				else if(humidity_alert_counter < 0)
+					humidity_alert_counter++;
+			}
+
+			// Check if the value can be alerted again
+			if((humidity_alert_counter == 0) && humidity_is_alerted){
+				humidity_is_alerted = false;
+			}
+
+			// Check if it is the moment to alert
+			if((humidity_alert_counter == -DHT22_HUMIDITY_TICKS_TO_ALERT) && !humidity_is_alerted){
+
+				mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on lower threshold (value: humidity)");
+
+				humidity_is_alerted = true;
+				msg_id++;
+			}
+			else if((humidity_alert_counter == DHT22_HUMIDITY_TICKS_TO_ALERT) && !humidity_is_alerted){
+
+				mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on upper threshold (value: humidity)");
+
+				humidity_is_alerted = true;
+				msg_id++;
+			}
+		}
+
+		// Temperature alert
+		if(DHT22_ALERT_TEMPERATURE){
+
+			// Update counter
+			if((temperature < DHT22_TEMPERATURE_LOWER_THRESHOLD) && (temperature_alert_counter > -DHT22_TEMPERATURE_TICKS_TO_ALERT))
+				temperature_alert_counter--;
+			else if((temperature > DHT22_TEMPERATURE_UPPER_THRESHOLD) && (temperature_alert_counter < DHT22_TEMPERATURE_TICKS_TO_ALERT))
+				temperature_alert_counter++;
+			else{
+				if(temperature_alert_counter > 0)
+					temperature_alert_counter--;
+				else if(temperature_alert_counter < 0)
+					temperature_alert_counter++;
+			}
+
+			// Check if the value can be alerted again
+			if((temperature_alert_counter == 0) && temperature_is_alerted){
+				temperature_is_alerted = false;
+			}
+
+			// Check if it is the moment to alert
+			if((temperature_alert_counter == -DHT22_TEMPERATURE_TICKS_TO_ALERT) && !temperature_is_alerted){
+
+				mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on lower threshold (value: temperature)");
+
+				temperature_is_alerted = true;
+				msg_id++;
+			}
+			else if((temperature_alert_counter == DHT22_TEMPERATURE_TICKS_TO_ALERT) && !temperature_is_alerted){
+
+				mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on upper threshold (value: temperature)");
+
+				temperature_is_alerted = true;
+				msg_id++;
+			}
+		}
+
 		pthread_mutex_unlock(&mutex_dht22);
 
 		vTaskDelay(DHT22_TIME_TO_UPDATE_DATA);
@@ -210,11 +295,15 @@ sensor_data_t dht22_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"Humidity");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = humidity;
+	aux.sensor_values[0].upper_threshold.fval = DHT22_HUMIDITY_UPPER_THRESHOLD;
+	aux.sensor_values[0].lower_threshold.fval = DHT22_HUMIDITY_LOWER_THRESHOLD;
 
 	aux.sensor_values[1].showOnLCD = DHT22_SHOW_TEMPERATURE_ON_LCD;
 	strcpy(aux.sensor_values[1].valueName,"Temperature");
 	aux.sensor_values[1].sensor_value_type = FLOAT;
 	aux.sensor_values[1].sensor_value.fval = temperature;
+	aux.sensor_values[1].upper_threshold.fval = DHT22_TEMPERATURE_UPPER_THRESHOLD;
+	aux.sensor_values[1].lower_threshold.fval = DHT22_TEMPERATURE_LOWER_THRESHOLD;
 
 	pthread_mutex_unlock(&mutex_dht22);
 
