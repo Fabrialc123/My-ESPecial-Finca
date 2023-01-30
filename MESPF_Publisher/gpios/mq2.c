@@ -13,6 +13,7 @@
 
 #include "esp_log.h"
 #include "string.h"
+#include "mqtt/mqtt_commands.h"
 
 static const char TAG[] = "mq2";
 
@@ -30,6 +31,14 @@ static void mq2_task(void *pvParameters){
 
 	int auxRead_raw, read_raw;
 
+	// Variables related to the alerts
+
+	int msg_id = 0;
+
+	int smoke_gas_percentage_alert_counter = 0;
+
+	bool smoke_gas_percentage_is_alerted = false;
+
 	for(;;){
 
 		pthread_mutex_lock(&mutex_mq2);
@@ -43,6 +52,43 @@ static void mq2_task(void *pvParameters){
         read_raw = auxRead_raw / N_SAMPLES;
 
         smoke_gas_percentage = (((float)read_raw - (float)MQ2_LOW_V) / ((float)MQ2_HIGH_V - (float)MQ2_LOW_V)) * 100;
+
+		// Smoke gas alert
+		if(MQ2_ALERT_SMOKE_GAS){
+
+			// Update counter
+			if((smoke_gas_percentage < MQ2_SMOKE_GAS_LOWER_THRESHOLD) && (smoke_gas_percentage_alert_counter > -MQ2_SMOKE_GAS_TICKS_TO_ALERT))
+				smoke_gas_percentage_alert_counter--;
+			else if((smoke_gas_percentage > MQ2_SMOKE_GAS_UPPER_THRESHOLD) && (smoke_gas_percentage_alert_counter < MQ2_SMOKE_GAS_TICKS_TO_ALERT))
+				smoke_gas_percentage_alert_counter++;
+			else{
+				if(smoke_gas_percentage_alert_counter > 0)
+					smoke_gas_percentage_alert_counter--;
+				else if(smoke_gas_percentage_alert_counter < 0)
+					smoke_gas_percentage_alert_counter++;
+			}
+
+			// Check if the value can be alerted again
+			if((smoke_gas_percentage_alert_counter == 0) && smoke_gas_percentage_is_alerted){
+				smoke_gas_percentage_is_alerted = false;
+			}
+
+			// Check if it is the moment to alert
+			if((smoke_gas_percentage_alert_counter == -MQ2_SMOKE_GAS_TICKS_TO_ALERT) && !smoke_gas_percentage_is_alerted){
+
+				mqtt_app_send_alert("MQ2", msg_id, "WARNING in Sensor MQ2! exceed on lower threshold (value: smoke_gas_percentage)");
+
+				smoke_gas_percentage_is_alerted = true;
+				msg_id++;
+			}
+			else if((smoke_gas_percentage_alert_counter == MQ2_SMOKE_GAS_TICKS_TO_ALERT) && !smoke_gas_percentage_is_alerted){
+
+				mqtt_app_send_alert("MQ2", msg_id, "WARNING in Sensor MQ2! exceed on upper threshold (value: smoke_gas_percentage)");
+
+				smoke_gas_percentage_is_alerted = true;
+				msg_id++;
+			}
+		}
 
         pthread_mutex_unlock(&mutex_mq2);
 
@@ -102,6 +148,8 @@ sensor_data_t mq2_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"S/G");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = smoke_gas_percentage;
+	aux.sensor_values[0].upper_threshold.fval = MQ2_SMOKE_GAS_UPPER_THRESHOLD;
+	aux.sensor_values[0].lower_threshold.fval = MQ2_SMOKE_GAS_LOWER_THRESHOLD;
 
 	pthread_mutex_unlock(&mutex_mq2);
 
