@@ -22,7 +22,16 @@
 
 #define HC_RS04_TIME_TO_UPDATE_DATA			100 * 5 	// 1 second = 100 ticks
 
+// Value related to the LCD
+
 #define HC_RS04_SHOW_WATER_LEVEL_ON_LCD		true
+
+// Values related to the alerts
+
+#define HC_RS04_ALERT_WATER_LEVEL			true
+#define HC_RS04_WATER_LEVEL_TICKS_TO_ALERT	3
+#define HC_RS04_WATER_LEVEL_UPPER_THRESHOLD	70.0
+#define HC_RS04_WATER_LEVEL_LOWER_THRESHOLD	0.0
 
 /*
  * Initializes HC_RS04 peripheral
