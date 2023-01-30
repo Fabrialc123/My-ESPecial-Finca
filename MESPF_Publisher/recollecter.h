@@ -31,6 +31,8 @@ typedef struct {
 	char valueName[CHAR_LENGTH];
 	sensor_value_type_e sensor_value_type;
 	union sensor_value_u sensor_value;
+	union sensor_value_u upper_threshold;
+	union sensor_value_u lower_threshold;
 }sensor_value_t;
 
 typedef struct {
