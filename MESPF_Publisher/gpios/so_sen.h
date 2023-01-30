@@ -23,7 +23,16 @@ static const adc_atten_t atten_so_sen = ADC_ATTEN_DB_11;
 
 #define SO_SEN_TIME_TO_UPDATE_DATA	100 * 5 				// 1 second = 100 ticks
 
+// Value related to the LCD
+
 #define SO_SEN_SHOW_MOISTURE_PERCENTAGE_ON_LCD	true
+
+// Values related to the alerts
+
+#define SO_SEN_ALERT_MOISTURE					true
+#define SO_SEN_MOISTURE_TICKS_TO_ALERT			3
+#define SO_SEN_MOISTURE_UPPER_THRESHOLD			70.0
+#define SO_SEN_MOISTURE_LOWER_THRESHOLD			0.0
 
 /*
  * Initializes SO_SEN peripheral
