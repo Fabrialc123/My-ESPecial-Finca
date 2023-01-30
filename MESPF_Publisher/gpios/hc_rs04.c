@@ -17,6 +17,7 @@
 #include "soc/rtc.h"
 #include "driver/mcpwm.h"
 #include "driver/gpio.h"
+#include "mqtt/mqtt_commands.h"
 
 static const char TAG[]  = "hc_rs04";
 
@@ -67,6 +68,14 @@ static void hc_rs04_task(void *pvParameters){
 	uint32_t pulse_width_us;
 	float distance;
 
+	// Variables related to the alerts
+
+	int msg_id = 0;
+
+	int water_level_percentage_alert_counter = 0;
+
+	bool water_level_percentage_is_alerted = false;
+
 	for(;;){
 
 		// Pull up trig pin for 10 us
@@ -90,6 +99,43 @@ static void hc_rs04_task(void *pvParameters){
 
         	water_level_percentage = 100 - (((distance - DISTANCE_BETWEEN_SENSOR_AND_TANK) / TANK_LENGTH) * 100);
         }
+
+		// Water level alert
+		if(HC_RS04_ALERT_WATER_LEVEL){
+
+			// Update counter
+			if((water_level_percentage < HC_RS04_WATER_LEVEL_LOWER_THRESHOLD) && (water_level_percentage_alert_counter > -HC_RS04_WATER_LEVEL_TICKS_TO_ALERT))
+				water_level_percentage_alert_counter--;
+			else if((water_level_percentage > HC_RS04_WATER_LEVEL_UPPER_THRESHOLD) && (water_level_percentage_alert_counter < HC_RS04_WATER_LEVEL_TICKS_TO_ALERT))
+				water_level_percentage_alert_counter++;
+			else{
+				if(water_level_percentage_alert_counter > 0)
+					water_level_percentage_alert_counter--;
+				else if(water_level_percentage_alert_counter < 0)
+					water_level_percentage_alert_counter++;
+			}
+
+			// Check if the value can be alerted again
+			if((water_level_percentage_alert_counter == 0) && water_level_percentage_is_alerted){
+				water_level_percentage_is_alerted = false;
+			}
+
+			// Check if it is the moment to alert
+			if((water_level_percentage_alert_counter == -HC_RS04_WATER_LEVEL_TICKS_TO_ALERT) && !water_level_percentage_is_alerted){
+
+				mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on lower threshold (value: water_level_percentage)");
+
+				water_level_percentage_is_alerted = true;
+				msg_id++;
+			}
+			else if((water_level_percentage_alert_counter == HC_RS04_WATER_LEVEL_TICKS_TO_ALERT) && !water_level_percentage_is_alerted){
+
+				mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on upper threshold (value: water_level_percentage)");
+
+				water_level_percentage_is_alerted = true;
+				msg_id++;
+			}
+		}
 
 		pthread_mutex_unlock(&mutex_hc_rs04);
 
@@ -180,6 +226,9 @@ sensor_data_t hc_rs04_get_sensor_data(void){
 	strcpy(aux.sensor_values[0].valueName,"Water level");
 	aux.sensor_values[0].sensor_value_type = FLOAT;
 	aux.sensor_values[0].sensor_value.fval = water_level_percentage;
+	aux.sensor_values[0].upper_threshold.fval = HC_RS04_WATER_LEVEL_UPPER_THRESHOLD;
+	aux.sensor_values[0].lower_threshold.fval = HC_RS04_WATER_LEVEL_LOWER_THRESHOLD;
+
 
 	pthread_mutex_unlock(&mutex_hc_rs04);
 
