@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <mysql.h>
 #define	DB_SERVER	"localhost"
@@ -17,7 +18,17 @@
 
 MYSQL *conn;
 
+void *pingDatabase(void *args){
+	while(1){
+		sleep(1800);
+		fprintf(stdout,"PING \n");
+		mysql_ping(conn); // Ping to prevent disconnect if idle too long.
+	}
+}
+
 bool db_connection_init(){
+	pthread_t thid;
+	
 	bool recon = 1;
 	conn = mysql_init(NULL);
 
@@ -32,6 +43,10 @@ bool db_connection_init(){
 
 	if (mysql_query(conn,"INSERT INTO boot VALUES (SYSDATE())")){
 		fprintf(stderr,"%s \n", mysql_error(conn));
+	}
+	
+	if(pthread_create(&thid, NULL, pingDatabase, "pingDatabase") != 0){
+		fprintf(stderr,"Error in pthread_create! \n");	
 	}
 
 	return true;
@@ -92,8 +107,6 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 	strcat(query,"\',\'");
 	strcat(query,msg->topic);
 	strcat(query,"\')");
-
-	mysql_ping(conn); // Reconnects if idle too long
 	
 	if(mysql_query(conn,query)){
 		fprintf(stderr, "%s \n", mysql_error(conn));
