@@ -21,19 +21,18 @@ import org.eclipse.paho.client.mqttv3.MqttClient
 
 // Se pone /# para mostrar todos los subtopicos de ese topico
 
-const val MQTT_SERVER = "188.127.160.18"
+const val MQTT_SERVER = "188.127.160.18:1883"
 //const val MQTT_SERVER = "broker.mqttdashboard.com"
 //const val MQTT_SCAN = "MESPF/SENS/SCAN" //TOpico donde publicas tu nombre como user
 const val MQTT_SENSORES = "MESPF/SENS/"
 const val MQTT_EXTRA = "MESPF/SENS/+/+/+/INFO" //AÑADIR ESTO AL FINAL DEL TOPICO
 var actualTopic: String = "" // inicia sin topico
-const val USER_MQTT: String = "RARES"
 
 class MainActivity : AppCompatActivity() {
 
 
     private lateinit var binding: ActivityMainBinding
-    private var esp32MutableList: MutableList<Esp32> = Esp32Provider.espList.toMutableList() //la lista que vamos a modificar y que se cargara en el recycler
+    private var esp32MutableList: MutableList<Esp32> = mutableListOf<Esp32>() //la lista que vamos a modificar y que se cargara en el recycler
     private lateinit var adapter: EspAdapter
     private var mqttData: Mqtt? = null
     private var topicToConnect: String = ""
@@ -47,12 +46,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         initRecyclerView()
 
-
-
-        //TODO Establecer conexion con broker mqtt
-        var mqttObje: MqttClient
         mqttData = Mqtt(MQTT_SERVER)
-
 
         //Inicializar database
         readFromTopicDB()
@@ -83,9 +77,12 @@ class MainActivity : AppCompatActivity() {
 
                 val indexSlah =topicToConnect.lastIndexOf("/")
                 val textAfterSlash = if(indexSlah != -1) topicToConnect.substring(indexSlah +1) else ""
-                val newEsp = Esp32(textAfterSlash, 0.0, 0.0, 0.0, true, true, false);
-                esp32MutableList.add(newEsp)
-                adapter.notifyItemInserted(adapter.itemCount - 1)
+                if(textAfterSlash != ""){
+                    val newEsp = Esp32(textAfterSlash,textAfterSlash, 0.0, 0.0, 0.0, 0.0, 0.0);
+                    if(!esp32MutableList.contains(newEsp))
+                        esp32MutableList.add(newEsp)
+                    adapter.notifyItemInserted(adapter.itemCount - 1)
+                }
             }while(cursor.moveToNext())
         }
         cursor.close()
@@ -144,9 +141,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            val newEsp = Esp32(actualTopic, 22.0, 12.0, 1.0, true, true, false);
-            esp32MutableList.add(newEsp)
-            adapter.notifyItemInserted(adapter.itemCount - 1) // notificamos al adapter que se añadio un item en la posicion final
+            //val newEsp = Esp32(actualTopic, 22.0, 12.0, 1.0, true, true, false);
+            //esp32MutableList.add(newEsp)
+            //adapter.notifyItemInserted(adapter.itemCount - 1) // notificamos al adapter que se añadio un item en la posicion final
 
         }
 

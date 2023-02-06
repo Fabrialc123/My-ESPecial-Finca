@@ -12,6 +12,8 @@ class EspAdapter(private val espList: List<Esp32>,
                  private val onClickListener:(Esp32)-> Unit,
                  private val onclickEdit:(Int) -> Unit) : RecyclerView.Adapter<EspViewHolder>() {
 
+    var lastSelectedPosition = RecyclerView.NO_POSITION
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): EspViewHolder {
         val layoutInflater = LayoutInflater.from(parent.context)
         return EspViewHolder(layoutInflater.inflate(R.layout.item_esp32, parent, false))
@@ -23,6 +25,11 @@ class EspAdapter(private val espList: List<Esp32>,
 
 
     override fun onBindViewHolder(holder: EspViewHolder, position: Int) {
+        holder.isSelected = (position == lastSelectedPosition)
+        holder.itemView.setOnClickListener{
+            lastSelectedPosition = position
+            notifyDataSetChanged()
+        }
         val item = espList[position]        // onclickDelete return position to delete
         holder.render(item, onClickListener, onclickEdit)
     }

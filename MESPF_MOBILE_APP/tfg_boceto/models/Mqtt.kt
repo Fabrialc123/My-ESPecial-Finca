@@ -127,6 +127,10 @@ class Mqtt(uri: String) {
         }
     }
 
+    fun connected(): Boolean {
+        return mqttClient.isConnected()
+    }
+
 
 
 }

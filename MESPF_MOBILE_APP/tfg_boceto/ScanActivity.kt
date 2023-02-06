@@ -26,6 +26,8 @@ private lateinit var adapter: TopicAdapter
 private lateinit var elementoElegio: String
 private lateinit var usernameLogin: String
 private lateinit var passwordLogin: String
+private const val DB_NAME = "TOPIC_TABLE"
+private const val COL_NAME = "Nombre"
 
 
 class ScanActivity : AppCompatActivity() {
@@ -46,8 +48,8 @@ class ScanActivity : AppCompatActivity() {
 
         //Get las variables del intent anterior
         val intent = Intent(this, ScanActivity::class.java)
-        usernameLogin = intent.getStringExtra("username").toString()
-        passwordLogin = intent.getStringExtra("password").toString()
+        //usernameLogin = intent.getStringExtra("username").toString()
+        //passwordLogin = intent.getStringExtra("password").toString()
 
 
         mqttDatos?.connect(usernameLogin, passwordLogin,::suscribesTopic, ::onMqttError)
@@ -57,22 +59,14 @@ class ScanActivity : AppCompatActivity() {
 
         Toast.makeText(this, "Espere un momento mientras se buscan dispositivos", Toast.LENGTH_LONG).show()
 
-        //Espera de 1 segundo
-        //val handler = Handler()
-        //handler.postDelayed({}, 1500)
-
-        //mqttDatos?.suscribeTopic(MQTT_RECIBE)
         binding.scanBtnAdd.setOnClickListener {
             addTopicFunc()
         }
     }
 
-    private fun notDo(){
-
-    }
 
     private fun onMqttError(failure: MqttResultado.Failure) {
-        //Toast.makeText(this, "Error connecting to mqtt ", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Error connecting to mqtt ", Toast.LENGTH_SHORT).show()
 
     }
 
@@ -109,6 +103,7 @@ class ScanActivity : AppCompatActivity() {
 
 
                 if(!topicMutableList.contains(topicoN)){
+
                     topicMutableList.add(topicoN)
                     adapter.notifyItemInserted(adapter.itemCount - 1)
                 }
@@ -143,11 +138,36 @@ class ScanActivity : AppCompatActivity() {
         elementoElegio = topic;
     }
 
+    private fun checkTopicExist(topicIn: String): Boolean{
+        var topic: String = topicIn
+        val dbAct = TopicDatabaseHelper(this)
+        val dbR = dbAct.readableDatabase
+        val curs = dbR.query(
+            DB_NAME,
+            arrayOf(COL_NAME),
+            "Nombre = ?",
+            arrayOf(topic),
+            null,
+            null,
+            null
+        )
+        val nameExists = curs.count > 0
+        curs.close()
+        dbR.close()
+        return nameExists
+    }
 
     private fun addTopicFunc() {
         mqttDatos?.unsubscribe(MQTT_RECIBE)
-        var topic: String = elementoElegio
         val dbAct = TopicDatabaseHelper(this)
+
+        if(checkTopicExist(elementoElegio)){
+            Toast.makeText(this@ScanActivity, "Topico existente ", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+
+        val cursor = dbAct
         //Introducimos topic en database
         //TODO insert en el database
         val db = dbAct.writableDatabase
@@ -164,7 +184,14 @@ class ScanActivity : AppCompatActivity() {
         Toast.makeText(this@ScanActivity, "Se ha suscrito al dispositivo "+ elementoElegio, Toast.LENGTH_SHORT).show()
 
         //Desuscribir del topico una vez se ha conseguido el nombre que se deseaba
-        mqttDatos?.unsubscribe(elementoElegio)
+        if(mqttDatos?.connected() == true)
+            mqttDatos?.unsubscribe(MQTT_RECIBE)
+    }
+
+    override fun onBackPressed() {
+        super.onBackPressed()
+        if(mqttDatos?.connected() == true)
+            mqttDatos?.unsubscribe(MQTT_RECIBE)
     }
 
 

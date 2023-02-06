@@ -18,12 +18,20 @@ class TopicAdapter(
         val layoutInflater = LayoutInflater.from(parent.context)
         return TopicViewHolder(layoutInflater.inflate(R.layout.item_topic_scan, parent, false))
     }
-
+    var lastSelectedPosition = RecyclerView.NO_POSITION
 
     override fun onBindViewHolder(holder: TopicViewHolder, position: Int) {
         val item = topicList[position]
 
-        var rowLinearlayout = holder.itemView.findViewById<LinearLayout>(R.id.scanRecyclerList)
+
+
+        holder.isSelected = (position == lastSelectedPosition)
+        holder.itemView.setOnClickListener {
+            lastSelectedPosition = position
+            notifyDataSetChanged()
+        }
+
+        //var rowLinearlayout = holder.itemView.findViewById<LinearLayout>(R.id.scanRecyclerList)
         //rowLinearlayout.setBackgroundColor(Color.parseColor("#FFFFFF")) // todos los colores a blanco
         //holder.itemView.setBackgroundColor(Color.parseColor("#858B8E")) // el item seleccionado en gris
 
