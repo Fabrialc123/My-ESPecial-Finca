@@ -5,6 +5,7 @@
  *      Author: fabri
  */
 
+
 #include <gpios/led_rgb.h>
 #include "wifi_app.h"
 #include "task_common.h"
@@ -23,10 +24,9 @@
 
 #include <tcpip_adapter.h> // TO GET IP
 
-static const char TAG[] = "wifi_app";
+#include <log.h>
 
-//extern int WIFI_CONNECTED;
-// extern pthread_mutex_t mutex_WIFI;
+static const char TAG[] = "wifi_app";
 
 static QueueHandle_t wifi_app_queue_handle;
 
@@ -45,22 +45,34 @@ static int WIFI_CONNECTED = 0;
  * @param event_data event data
  */
 static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
-
+	char dis_log[LOG_MSG_LEN];
+	wifi_event_sta_disconnected_t *data;
 	if (event_base == WIFI_EVENT){
 		switch(event_id){
 			case WIFI_EVENT_STA_START:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
+				log_add("WIFI_EVENT_STA_START\n");
+				led_rgb_wifi_app_started(); // WHITE
 				esp_wifi_connect();
 				break;
 
 			case WIFI_EVENT_STA_CONNECTED:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
+				log_add("WIFI_EVENT_STA_CONNECTED\n");
+				led_rgb_http_server_started(); 	// YELLOW
 				break;
 
 			case WIFI_EVENT_STA_DISCONNECTED:
+
+				data = (wifi_event_sta_disconnected_t*) event_data;
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
+
+				sprintf(dis_log,"WIFI_EVENT_STA_DISCONNECTED, Reason: %d \n", data->reason);
+				log_add(dis_log);
+
 				pthread_mutex_lock(&mutex_WIFI);
 					WIFI_CONNECTED = 0;
+					led_rgb_test(); // RED
 				pthread_mutex_unlock(&mutex_WIFI);
 
 				ESP_LOGE(TAG," Retrying to reconnect to SSID: %s and PSSWD: %s ", WIFI_STA_SSID, WIFI_STA_PASSWORD);
@@ -78,6 +90,7 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 				ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
 				pthread_mutex_lock(&mutex_WIFI);
 					WIFI_CONNECTED = 1;
+					led_rgb_wifi_connected();	// GREEN
 				pthread_mutex_unlock(&mutex_WIFI);
 				break;
 		}
@@ -141,7 +154,7 @@ static void wifi_app_task (void *pvParameters){
 					ESP_LOGI(TAG, "WIFI_APP_MSG_START_HTTP_SERVER");
 
 					http_server_start();
-					led_rgb_http_server_started();
+					//led_rgb_http_server_started();
 					break;
 
 				case WIFI_APP_MSG_CONNECTING_FROM_HTTP_SERVER:
@@ -151,7 +164,7 @@ static void wifi_app_task (void *pvParameters){
 				case WIFI_APP_MSG_STA_CONNECTED_GOT_IP:
 					ESP_LOGI(TAG, "WIFI_APP_MSG_STA_CONNECTED_GOT_IP");
 
-					led_rgb_wifi_connected();
+					//led_rgb_wifi_connected();
 					break;
 
 				default:

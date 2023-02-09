@@ -15,6 +15,8 @@
 #include "esp_ota_ops.h"
 #include "sys/param.h"
 
+#include <log.h>
+
 
 static const char TAG[] = "http_server"; // It is used for serial console messages
 
@@ -237,6 +239,16 @@ static esp_err_t http_server_OTA_status_handler(httpd_req_t *req){
 
 	return ESP_OK;
 }
+
+
+esp_err_t log_get_handler(httpd_req_t *req)
+{
+	char log[LOG_BUF_LEN];
+	log_get(log);
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, log, strlen(log));
+    return ESP_OK;
+}
 /**
  * Sets up default httpd server configuration
  * @return http server instance handle if successful, NULL otherwise
@@ -310,6 +322,14 @@ static httpd_handle_t http_server_configure(void){
 				.user_ctx = NULL
 		};
 		httpd_register_uri_handler(http_server_handle, &OTA_status);
+
+	    httpd_uri_t log = {
+	        .uri = "/log",
+	        .method = HTTP_GET,
+	        .handler = log_get_handler,
+	        .user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &log));
 
 		return http_server_handle;
 	}
