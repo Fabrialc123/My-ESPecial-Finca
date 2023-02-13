@@ -9,8 +9,8 @@
 #define MAIN_LOG_H_
 
 //#include <log.c>
-#define LOG_BUF_LEN 10000
-#define LOG_MSG_LEN 100
+#define LOG_BUF_LEN 1000
+#define LOG_MSG_LEN 50
 
 void log_add(const char *msg);
 
