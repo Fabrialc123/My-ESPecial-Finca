@@ -3,6 +3,7 @@ package com.example.tfg_boceto.adapter
 
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.tfg_boceto.Esp32
@@ -13,6 +14,7 @@ class EspAdapter(private val espList: List<Esp32>,
                  private val onclickEdit:(Int) -> Unit) : RecyclerView.Adapter<EspViewHolder>() {
 
     var lastSelectedPosition = RecyclerView.NO_POSITION
+
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): EspViewHolder {
         val layoutInflater = LayoutInflater.from(parent.context)
@@ -32,6 +34,10 @@ class EspAdapter(private val espList: List<Esp32>,
         }
         val item = espList[position]        // onclickDelete return position to delete
         holder.render(item, onClickListener, onclickEdit)
+
+        //ULTIMA PARTE AÑADIDA PARA ACTUALIZAR LISTA AL CAMBIAR LOS ATRIBUTOS
+        holder.updateView()
+
     }
 
 }

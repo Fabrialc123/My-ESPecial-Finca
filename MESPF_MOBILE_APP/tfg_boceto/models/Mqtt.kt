@@ -86,9 +86,9 @@ class Mqtt(uri: String) {
     fun disconnect(){
         mqttClient.disconnect()
     }
-
     fun suscribeTopic(topic: String): LiveData<MqttResultado>{
         _mqttStatusLiveData.postValue(MqttResultado.Waiting)
+
         mqttClient.subscribe(topic, 0, null, object: IMqttActionListener{
             override fun onSuccess(asyncActionToken: IMqttToken?) {
                 _mqttStatusLiveData.postValue(MqttResultado.Success("Suscribed".toByteArray()))

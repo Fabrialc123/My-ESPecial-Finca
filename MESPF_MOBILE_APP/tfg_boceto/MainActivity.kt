@@ -3,6 +3,7 @@ package com.example.tfg_boceto
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 
 import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
@@ -17,6 +18,8 @@ import com.example.tfg_boceto.models.Mqtt
 import com.example.tfg_boceto.models.MqttResultado
 import com.example.tfg_boceto.models.persistencia.TopicDatabaseHelper
 import org.eclipse.paho.client.mqttv3.MqttClient
+import org.json.JSONObject
+import org.json.JSONTokener
 
 
 // Se pone /# para mostrar todos los subtopicos de ese topico
@@ -38,21 +41,32 @@ class MainActivity : AppCompatActivity() {
     private var topicToConnect: String = ""
     private var userLogin: String = "MESPF_USER"
     private var userPassword: String = "MESPF_USER"
+    private var sensoresList: MutableList<String> = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
+
+
         initRecyclerView()
-
-        mqttData = Mqtt(MQTT_SERVER)
-
         //Inicializar database
         readFromTopicDB()
 
-    }
+        if(!sensoresList.isEmpty()){
+            mqttData = Mqtt(MQTT_SERVER)
 
+            mqttData?.connect(userLogin,userPassword,::subscribesTopic , ::onMqttError)
+        }
+
+
+
+    }
+    //TODO Acciones para realizar cuando se selecciona uno de los elementos del recyvler view
+    private fun onSensorSelected(){
+
+    }
     private fun nothing(){}
     @SuppressLint("Range")
     private fun readFromTopicDB(){
@@ -61,31 +75,59 @@ class MainActivity : AppCompatActivity() {
         val db = dbAct.readableDatabase
         val tabla = "TOPIC_TABLE"
 
-        val cursor = db.query(tabla, arrayOf("Nombre"), null,null,null,null,null)
 
+        val cursor = db.query(tabla, arrayOf("Nombre"), null,null,null,null,null)
+        val curso2 = db.query(tabla, arrayOf("Alias"), null,null,null,null,null)
         if(cursor.moveToFirst()){
             val nameColumnIndex = cursor.getColumnIndexOrThrow("Nombre")
+            val aliasColumnIndex = curso2.getColumnIndexOrThrow("Alias")
+            //TODO AÑADIR CADA NOMBRE DE TOPICO A UN ARRAY DE STRING Y PASARSELO DIRECTO COMO UN SOLO TOPIC
+            //TODO LA DE ABAJO SERIA LA FORMA
+            /**
+             *
+             * val topic1 = "topic1"
+            val topic2 = "topic2"
+            val topics = arrayOf(topic1, topic2)
+            val qos = intArrayOf(1, 1)
 
+            mqttClient.subscribe(topics, qos)
+             *
+             *
+             */
             do{
-                val name = MQTT_SENSORES + cursor.getString(nameColumnIndex)
-                name.plus("/#")
+                val esp_name = cursor.getString(nameColumnIndex)
+                val esp_alias = cursor.getString(aliasColumnIndex)
+                val name = MQTT_SENSORES + esp_name +"/+/+/INFO/#"
+
                 topicToConnect = name
-                Toast.makeText(this@MainActivity, "El topico es" + topicToConnect, Toast.LENGTH_SHORT).show()
-                if(topicToConnect != "")
-                    mqttData?.connect(userLogin,userPassword,::subscribesTopic , ::onMqttError)
+                Toast.makeText(this@MainActivity, "El topico es" + name, Toast.LENGTH_SHORT).show()
+                Log.d("TOPIC", "Topico añadido :"+name )
+                Log.d("TOPIC", "Nombre DB  :"+esp_name )
+                Log.d("TOPIC", "Alias DB  :"+esp_alias )
+                if(name != ""){
 
-
-                val indexSlah =topicToConnect.lastIndexOf("/")
-                val textAfterSlash = if(indexSlah != -1) topicToConnect.substring(indexSlah +1) else ""
-                if(textAfterSlash != ""){
-                    val newEsp = Esp32(textAfterSlash,textAfterSlash, 0.0, 0.0, 0.0, 0.0, 0.0);
-                    if(!esp32MutableList.contains(newEsp))
+                    val newEsp = Esp32(esp_name,esp_alias, -1000.0, -1000.0, -1000.0, -1000.0, -1000.0);
+                    //SI NO EXISTE ESE NOMBRE de Esp en la lista se añade y lo añadimos a elementos para suscribirnos
+                    if(!esp32MutableList.any{(it.nombre_esp == esp_name)}){
                         esp32MutableList.add(newEsp)
-                    adapter.notifyItemInserted(adapter.itemCount - 1)
+                        adapter.notifyItemInserted(adapter.itemCount - 1) // notificamos al adapter que se añadio un item en la posicion final
+                        sensoresList.add(name)
+                    }
+
                 }
-            }while(cursor.moveToNext())
+
+                    //mqttData?.connect(userLogin,userPassword,::subscribesTopic , ::onMqttError)
+
+
+                //val indexSlah =topicToConnect.lastIndexOf("/")
+                //val textAfterSlash = if(indexSlah != -1) topicToConnect.substring(indexSlah +1) else ""
+                //if(textAfterSlash != ""){
+
+                //}
+            }while(cursor.moveToNext() && curso2.moveToNext())
         }
         cursor.close()
+        curso2.close()
         db.close()
     }
 
@@ -96,16 +138,18 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Error mqtt connect", Toast.LENGTH_LONG).show()
     }
 
-
     private fun subscribesTopic() = runOnUiThread {
-        mqttData?.suscribeTopic(topicToConnect)?.observe(this) { result ->
-            when (result) {
-                is MqttResultado.Failure -> onMqttError(result)
-                is MqttResultado.Success -> onMqttMessageReceived(result)
-                //TODO mostrar barra de carga de suscripcion a topic
-                else -> {}
+        for (topicoActual in sensoresList){
+            mqttData?.suscribeTopic(topicoActual)?.observe(this) { result ->
+                when (result) {
+                    is MqttResultado.Failure -> onMqttError(result)
+                    is MqttResultado.Success -> onMqttMessageReceived(result)
+                    //TODO mostrar barra de carga de suscripcion a topic
+                    else -> {}
+                }
             }
         }
+
     }
 
     private fun onMqttMessageReceived(result: MqttResultado.Success) {
@@ -120,25 +164,59 @@ class MainActivity : AppCompatActivity() {
                 //asignamos topico actual
                 actualTopic = msg
 
+
+                val input = topicCurr
+                val parts = input.split("/")
+                val desiredSubstring = parts[2]
+
+
+                //TODO SUMARLE /1/INFO al final del topico
+                Log.d("onMqttMessageReceived", "Topico actual :"+topicCurr)
+                Log.d("onMqttMessageReceived", "Nombre en topico suscrito es :"+desiredSubstring)
+                val objeto = esp32MutableList.first{ it.nombre_esp == desiredSubstring }
+                val indexDht = esp32MutableList.indexOf(objeto)
+
+                if(topicCurr.contains("DHT22")){
+
+                    //Buscamos el nombre del sensor dentro del topic
+
+                    //TODO PARSEAR
+                    objeto.temperatura = parseJSON(msg,2)
+                    objeto.humedad = parseJSON(msg, 1)
+                    Log.d("onMqttMessageReceived", "DHT22 valores: Temperatura: "+ objeto.temperatura +" Humedad"+objeto.humedad)
+                    //TEMPERATURA Y HUMEDAD AMBIENTE
+                }
+                else if(topicCurr.contains("MQ2")){
+                    //CONCENTRACION PARTICULAS GAS
+                    objeto.concentracion_gas = parseJSON(msg, 1)
+                    Log.d("onMqttMessageReceived", "MQ2 valores: Gas: "+ objeto.concentracion_gas)
+                }
+                else if(topicCurr.contains("HC-RS04")){
+                    //NIVEL DE AGUA
+                    objeto.nivel_agua = parseJSON(msg, 1)
+                    Log.d("onMqttMessageReceived", "HC-RS04 valores: nivel agua: "+ objeto.nivel_agua)
+
+                }else if(topicCurr.contains("SO-SEN")){
+                    //NIVEL HUMEDAD TIERRA
+                    objeto.humedad_tierra = parseJSON(msg, 1)
+                    Log.d("onMqttMessageReceived", "SO-SEN valores: humedad tierra: "+ objeto.humedad_tierra)
+                }
+                else{
+                    //No hacemos nada no es topico conocido
+                    Log.d("onMqttMessageReceived", "Mensaje no determinado" + msg)
+                }
+
+                //Insertar el objeto con los atributos cambiados en la misma posicion
+                esp32MutableList[indexDht] = objeto
+                //Notificar la informacion ha cambiado en esa posicion
+                adapter.notifyItemChanged(indexDht)
+
             }
 
 
             //TODO parsear cada elemento para el formato correspondiente usando las clases del paquete sensores
             else{
-                if(actualTopic.contains("DHT22")){
 
-                }
-                else if(actualTopic.contains("MQ2")){
-
-                }
-                else if(msg.contains("HC-RS04")){
-
-                }else if(msg.contains("SO-SEN")){
-
-                }
-                else{
-                    //No hacemos nada no es topico conocido
-                }
             }
 
             //val newEsp = Esp32(actualTopic, 22.0, 12.0, 1.0, true, true, false);
@@ -147,6 +225,15 @@ class MainActivity : AppCompatActivity() {
 
         }
 
+    }
+
+    private fun parseJSON(cadena: String, clave: Int): Double {
+
+        val jsonObject = JSONTokener(cadena).nextValue() as JSONObject
+
+        val dt = jsonObject.getJSONObject("DT")
+
+        return dt.getDouble(clave.toString())
     }
 
     //Recycler View
@@ -193,20 +280,6 @@ class MainActivity : AppCompatActivity() {
 
     //resultado de la actividad AddEspActivity
     private var resultLauncher = registerForActivityResult(StartActivityForResult()) { result ->
-        /*
-        if (result.resultCode == Activity.RESULT_OK) {
-            val name = result.data?.getStringExtra("nombre").toString()
-            var tempSi = result.data!!.getBooleanExtra("temperatura", false)
-            val humedadSi = result.data!!.getBooleanExtra("humedad", false)
-            val aguaSi = result.data!!.getBooleanExtra("agua", false)
-
-            //TODO recibir data actual del dispositivo esp
-            val newEsp = Esp32(name, 22, 12, 1, tempSi, humedadSi, aguaSi);
-            esp32MutableList.add(newEsp)
-            adapter.notifyItemInserted(adapter.itemCount - 1) // notificamos al adapter que se añadio un item en la posicion final
-
-        }
-        */
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -224,6 +297,9 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
 
     }
+
+
+
 
 
 }
