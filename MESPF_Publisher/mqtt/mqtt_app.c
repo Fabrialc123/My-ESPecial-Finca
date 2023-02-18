@@ -50,8 +50,8 @@ char *MQTT_APP_PERSONAL_NAME;
 static QueueHandle_t mqtt_app_queue_handle;
 static esp_mqtt_client_handle_t client;
 
-static int sended_packs;
-static int received_packs;
+//static int sended_packs;
+//static int received_packs;
 
 static pthread_mutex_t mutex_MQTT_APP_MQTT_CONNECTED;
 static int MQTT_CONNECTED = 0;
@@ -168,7 +168,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 		msg_id = esp_mqtt_client_subscribe(client, SCAN_TOPIC, MQTT_APP_QOS);
 		ESP_LOGI(TAG, "sent subscribe successful to topic %s , msg_id=%d",SCAN_TOPIC, msg_id);
 
-
+		if (MQTT_APP_TASK_HANDLE_DATA_SENDER == NULL)
 		xTaskCreatePinnedToCore(&mqtt_app_data_sender, "mqtt_app_data_sender", MQTT_APP_DATA_SENDER_STACK_SIZE, NULL, MQTT_APP_DATA_SENDER_PRIORITY, &MQTT_APP_TASK_HANDLE_DATA_SENDER, MQTT_APP_DATA_SENDER_CORE_ID);
 
         break;
@@ -178,9 +178,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         	MQTT_CONNECTED = -1;
         	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
 
-			ESP_LOGE(TAG, "Retrying reconnect in %d seconds...", MQTT_APP_SECONDS_TO_RECONNECT);
+        	/*
+			ESP_LOGE(TAG, "Retrying reconnect in %d seconds...", MQTT_APP_SECONDS_TO_RECONNECT/100);
 			vTaskDelay(MQTT_APP_SECONDS_TO_RECONNECT);
 			esp_mqtt_client_reconnect(client);
+			*/
 
         break;
 
@@ -250,6 +252,10 @@ static void mqtt_app_task(void *pvParameters){
 		.port = MQTT_APP_PORT,
 		.username = MQTT_USER,
 		.password = MQTT_PASSWD,
+
+		.disable_auto_reconnect = 0,
+		.reconnect_timeout_ms = MQTT_APP_MLSECS_TO_RECONNECT,
+
     };
 
     ESP_LOGE(TAG,"STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_TASK_STACK_SIZE);
@@ -265,18 +271,22 @@ static void mqtt_app_task(void *pvParameters){
 				case MQTT_APP_MSG_PUBLISH_DATA:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_PUBLISH_DATA to topic %s",msg.src);
 
-					//mqtt_app_send_data(msg.data);
 					mqtt_app_format_data(msg.data);
-					esp_mqtt_client_publish(client, msg.src, msg.data, 0, MQTT_APP_QOS, 0);
-					ESP_LOGI(TAG, "sent publish successful");
+
+					if (is_mqtt_connected()){
+						esp_mqtt_client_publish(client, msg.src, msg.data, 0, MQTT_APP_QOS, 0);
+						ESP_LOGI(TAG, "sent publish successful");
+					}else ESP_LOGI(TAG, "can't sent data! MQTT is disconnected");
 
 					break;
 
 				case MQTT_APP_MSG_SUBSCRIBE:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_SUBSCRIBE to topic %s", msg.data);
 
-				    esp_mqtt_client_subscribe(client, msg.data, MQTT_APP_QOS);
-				    ESP_LOGI(TAG, "sent subscribe to topic %s ",msg.data);
+					if (is_mqtt_connected()){
+						esp_mqtt_client_subscribe(client, msg.data, MQTT_APP_QOS);
+						ESP_LOGI(TAG, "sent subscribe to topic %s ",msg.data);
+					} else ESP_LOGI(TAG, "can't subscribe! MQTT is disconnected");
 
 					break;
 
@@ -326,9 +336,6 @@ void mqtt_app_start(void)
 //    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
 //    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
 //    esp_log_level_set("outbox", ESP_LOG_VERBOSE);
-
-	sended_packs = 0;
-	received_packs = 0;
 
 	if(pthread_mutex_init (&mutex_MQTT_APP_MQTT_CONNECTED, NULL) != 0){
 	 ESP_LOGE(TAG,"Failed to initialize the MQTT_CONNECTED mutex");

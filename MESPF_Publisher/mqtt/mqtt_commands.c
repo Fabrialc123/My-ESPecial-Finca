@@ -61,12 +61,11 @@ void mqtt_app_send_info(char* topic){
 		memset(&sensorName, 0, CHAR_LENGTH);
 		memset(&sensor_topic, 0, MQTT_APP_MAX_TOPIC_LENGTH);
 
-		len = get_sensor_data_json (i, &data);
+		len = get_sensor_data_json (i, data, sensorName);
 		if (len < 0 || len >= MQTT_APP_MAX_DATA_LENGTH){
 			ESP_LOGE(TAG2, "ERROR in get_sensor_data(sensor_id = %d)", i);
 			return;
 		}
-		get_sensor_data_name(i,sensorName);
 		if (strcmp(topic,SENSORS_TOPIC) == 0){
 			concatenate_topic(SENSORS_TOPIC, personal_name, sensorName, "1", INFO_TOPIC, NULL, NULL, sensor_topic);
 		}else {
