@@ -12,7 +12,6 @@ idf_component_register(SRCS main.c wifi_app.c http_server.c
 							gpios/hc_rs04.c
 							gpios/so_sen.c
 							gpios/rtc.c
-							test_sntp.c
 							log.c
 						INCLUDE_DIRS "."
 						EMBED_FILES webpage/app.css 
