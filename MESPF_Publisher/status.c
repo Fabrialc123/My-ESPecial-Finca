@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include <string.h>
 #include <esp_sntp.h>
+#include <recollecter.h>
 
 
 static const char TAG2[] = "STATUS";

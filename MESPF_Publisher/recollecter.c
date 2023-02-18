@@ -45,7 +45,7 @@ pthread_mutex_unlock(&mutex_RECOLLECTER);
 	return size;
 }
 
-int get_sensor_data_json (int sensor_id, char* data){
+int get_sensor_data_json (int sensor_id, char* data, char* sensorName){
 	char aux[CHAR_LENGTH];
 	sensor_data_t sensor_data;
 	int i;
@@ -54,6 +54,8 @@ int get_sensor_data_json (int sensor_id, char* data){
 	sensor_data = get_sensor_data(sensor_id);
 
 	if (sensor_data.valuesLen == 0) return -1;
+
+	strcpy(sensorName, sensor_data.sensorName);
 
 	strcpy(data, "{");
 	for (i = 0; i < sensor_data.valuesLen;i++){
@@ -85,7 +87,7 @@ int get_sensor_data_json (int sensor_id, char* data){
 	free(sensor_data.sensor_values);
 	return len;
 }
-
+/*
 void get_sensor_data_name(int sensor_id, char *name){
 	sensor_data_t sensor_data;
 
@@ -95,7 +97,7 @@ void get_sensor_data_name(int sensor_id, char *name){
 
 	strcpy(name, sensor_data.sensorName);
 }
-
+*/
 sensor_data_t get_sensor_data (int sensor_id){
 	recollecter_function foo;
 	sensor_data_t sensor_data;
@@ -126,3 +128,7 @@ void recollecter_start(void){
 
     ESP_LOGI(TAG, "recollecter started");
 }
+
+
+
+

@@ -31,8 +31,6 @@ typedef struct {
 	char valueName[CHAR_LENGTH];
 	sensor_value_type_e sensor_value_type;
 	union sensor_value_u sensor_value;
-	union sensor_value_u upper_threshold;
-	union sensor_value_u lower_threshold;
 }sensor_value_t;
 
 typedef struct {
@@ -48,9 +46,9 @@ int register_recollecter (recollecter_function rtr);
 
 int get_recollecters_size (void);
 
-int get_sensor_data_json (int sensor_id, char *data);
+int get_sensor_data_json (int sensor_id, char *data, char *sensorName);
 
-void get_sensor_data_name(int sensor_id, char *name);
+//void get_sensor_data_name(int sensor_id, char *name);
 
 sensor_data_t get_sensor_data (int sensor_id);
 
