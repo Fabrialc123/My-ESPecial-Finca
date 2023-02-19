@@ -358,3 +358,9 @@ void mqtt_app_getID(char *id){
 	strcpy(id, MQTT_APP_PERSONAL_NAME);
 }
 
+void mqtt_app_get_conf(char *ip, char *user, char *pass){
+	strcpy(ip, MQTT_APP_HOST);
+	strcpy(user,MQTT_USER);
+	strcpy(pass,MQTT_PASSWD);
+}
+

@@ -68,4 +68,6 @@ void mqtt_app_start(void);
 
 void mqtt_app_getID(char *id);
 
+void mqtt_app_get_conf(char *ip, char *user, char *pass);
+
 #endif /* MAIN_MQTT_MQTT_APP_H_ */
