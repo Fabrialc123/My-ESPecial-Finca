@@ -9,7 +9,28 @@ var otaTimerVar =  null;
  */
 $(document).ready(function(){
 	getUpdateStatus();
-});   
+	getConnectionsConfiguration();
+});
+
+function getConnectionsConfiguration()
+{
+    var xhr = new XMLHttpRequest();
+    var requestURL = "/ConnectionsConfiguration";		//ConnectionsConfiguration has to be handled
+    xhr.open('POST', requestURL, false);
+    xhr.send();
+    
+     if (xhr.readyState == 4 && xhr.status == 200) {
+     	var response = JSON.parse(xhr.responseText);
+     	
+		document.getElementById("WIFI_SSID").setAttribute("value",response.WIFI_SSID);
+		document.getElementById("WIFI_PASS").setAttribute("value",response.WIFI_PASS);
+		
+		document.getElementById("MQTT_IP").setAttribute("value",response.MQTT_IP);
+		document.getElementById("MQTT_USER").setAttribute("value",response.MQTT_USER);
+		document.getElementById("MQTT_PASS").setAttribute("value",response.MQTT_PASS);
+	}
+}
+   
 
 /**
  * Gets file name and size for display on the web page.
