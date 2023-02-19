@@ -304,6 +304,11 @@ void wifi_app_getIP(char *ip){
 	}
 }
 
+void wifi_app_get_conf(char *ssid, char *pass){
+	strcpy(ssid,WIFI_STA_SSID);
+	strcpy(pass,WIFI_STA_PASSWORD);
+}
+
 
 
 

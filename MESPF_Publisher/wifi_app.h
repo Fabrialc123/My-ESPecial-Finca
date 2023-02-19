@@ -71,4 +71,6 @@ void wifi_app_start(void);
 
 void wifi_app_getIP(char *ip);
 
+void wifi_app_get_conf(char *ssid, char *pass);
+
 #endif /* MAIN_WIFI_APP_H_ */

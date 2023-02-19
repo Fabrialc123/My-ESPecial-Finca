@@ -16,6 +16,8 @@
 #include "sys/param.h"
 
 #include <log.h>
+#include <wifi_app.h>
+#include <mqtt/mqtt_app.h>
 
 
 static const char TAG[] = "http_server"; // It is used for serial console messages
@@ -241,13 +243,32 @@ static esp_err_t http_server_OTA_status_handler(httpd_req_t *req){
 }
 
 
-esp_err_t log_get_handler(httpd_req_t *req)
+static esp_err_t log_get_handler(httpd_req_t *req)
 {
 	char log[LOG_BUF_LEN];
 	log_get(log);
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, log, strlen(log));
     return ESP_OK;
+}
+
+static esp_err_t ConnectionsConfiguration_handler(httpd_req_t *req){
+	char ConnConf[300];
+	char wifi_ssid[32],wifi_pass[64];
+	char mqtt_ip[32],mqtt_user[32],mqtt_pass[64];
+
+	ESP_LOGI(TAG, "ConnectionsConfiguration requested");
+
+	wifi_app_get_conf(wifi_ssid,wifi_pass);
+	mqtt_app_get_conf(mqtt_ip,mqtt_user,mqtt_pass);
+
+	sprintf(ConnConf, "{\"WIFI_SSID\":\"%s\",\"WIFI_PASS\":\"%s\",\"MQTT_IP\":\"%s\",\"MQTT_USER\":\"%s\",\"MQTT_PASS\":\"%s\"}", wifi_ssid, wifi_pass, mqtt_ip, mqtt_user, mqtt_pass);
+
+	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
+	httpd_resp_send(req, ConnConf, strlen(ConnConf));
+
+
+	return ESP_OK;
 }
 /**
  * Sets up default httpd server configuration
@@ -330,6 +351,14 @@ static httpd_handle_t http_server_configure(void){
 	        .user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &log));
+
+	    httpd_uri_t ConnectionsConfiguration = {
+	        .uri = "/ConnectionsConfiguration",
+	        .method = HTTP_POST,
+	        .handler = ConnectionsConfiguration_handler,
+	        .user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &ConnectionsConfiguration));
 
 		return http_server_handle;
 	}
