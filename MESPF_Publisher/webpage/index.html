@@ -15,17 +15,21 @@
 	</header>
 	
 	<div id="WIFI_CONF">
-	<h2>WIFI Configuration</h2>
-		<label>SSID: <input type="text" id="WIFI_SSID" name="WIFI_SSID"/></label>
-		<label>PASSWORD: <input type="text" id="WIFI_PASS" name="WIFI_PASS"/></label>
+	<h2>WIFI Configuration</h2> <span class="dot" id="WIFI_STATUS"></span>
+		<label>SSID: <input type="text" id="WIFI_SSID" name="WIFI_SSID" disabled/></label>
+		<label>PASSWORD: <input type="text" id="WIFI_PASS" name="WIFI_PASS" disabled/></label>
+		<input type="button" value="Submit" id="WIFI_SUBMIT" onclick="submitWifiConf();" hidden> 
+		<input type="button" value="Edit" id="WIFI_EDIT" onclick="editWifiConf();">
 	</div>
 	<hr>
 	
 	<div id="MQTT_CONF">
-	<h2>MQTT Configuration</h2>
-		<label>BROKER IP: <input type="text" id="MQTT_IP" name="MQTT_IP" /></label>
-		<label>USERNAME: <input type="text" id="MQTT_USER" name="MQTT_USER"/></label>
-		<label>PASSWORD: <input type="text" id="MQTT_PASS" name="MQTT_PASS"/></label>
+	<h2>MQTT Configuration</h2> <span class="dot" id="MQTT_STATUS"></span>
+		<label>BROKER IP: <input type="text" id="MQTT_IP" name="MQTT_IP" disabled/></label>
+		<label>USERNAME: <input type="text" id="MQTT_USER" name="MQTT_USER" disabled/></label>
+		<label>PASSWORD: <input type="text" id="MQTT_PASS" name="MQTT_PASS"disabled/></label>
+		<input type="button" value="Submit" id="MQTT_SUBMIT" onclick="submitMQTTConf();" hidden> 
+		<input type="button" value="Edit" id="MQTT_EDIT" onclick="editMQTTConf();">		
 	</div>
 	<hr>
 	

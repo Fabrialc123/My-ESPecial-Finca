@@ -22,12 +22,18 @@ function getConnectionsConfiguration()
      if (xhr.readyState == 4 && xhr.status == 200) {
      	var response = JSON.parse(xhr.responseText);
      	
-		document.getElementById("WIFI_SSID").setAttribute("value",response.WIFI_SSID);
-		document.getElementById("WIFI_PASS").setAttribute("value",response.WIFI_PASS);
+		document.getElementById("WIFI_SSID").value = response.WIFI_SSID;
+		document.getElementById("WIFI_PASS").value = response.WIFI_PASS;
+		if (response.WIFI_STATUS == 1) document.getElementById("WIFI_STATUS").style.color = 'green';
+		else if (response.WIFI_STATUS == 0) document.getElementById("WIFI_STATUS").style.color = 'red';
+		else document.getElementById("WIFI_STATUS").style.color = 'yellow';
 		
-		document.getElementById("MQTT_IP").setAttribute("value",response.MQTT_IP);
-		document.getElementById("MQTT_USER").setAttribute("value",response.MQTT_USER);
-		document.getElementById("MQTT_PASS").setAttribute("value",response.MQTT_PASS);
+		document.getElementById("MQTT_IP").value = response.MQTT_IP;
+		document.getElementById("MQTT_USER").value = response.MQTT_USER;
+		document.getElementById("MQTT_PASS").value = response.MQTT_PASS;
+		if (response.MQTT_STATUS == 1) document.getElementById("MQTT_STATUS").style.color = 'green';
+		else if (response.MQTT_STATUS == 0) document.getElementById("MQTT_STATUS").style.color = 'red';
+		else document.getElementById("MQTT_STATUS").style.color = 'yellow';
 	}
 }
    
@@ -135,6 +141,46 @@ function otaRebootTimer()
 	{
         otaTimerVar = setTimeout(otaRebootTimer, 1000);
     }
+}
+
+function submitWifiConf()
+{
+	window.alert("SSID: " + document.getElementById('WIFI_SSID').value + "\n" + "PASSWORD: " + document.getElementById('WIFI_PASS').value);
+	document.getElementById('WIFI_SSID').disabled = true;
+	document.getElementById('WIFI_PASS').disabled = true;
+	document.getElementById('WIFI_EDIT').hidden = false;
+	document.getElementById('WIFI_SUBMIT').hidden = true;
+	getConnectionsConfiguration();
+}
+
+function editWifiConf()
+{
+	document.getElementById('WIFI_SSID').disabled = false;
+	document.getElementById('WIFI_PASS').disabled = false;
+	document.getElementById('WIFI_EDIT').hidden = true;
+	document.getElementById('WIFI_SUBMIT').hidden = false;
+	getConnectionsConfiguration();
+}
+
+function submitMQTTConf()
+{
+	window.alert("IP: " + document.getElementById('MQTT_IP').value + "\n" + "USER: " + document.getElementById('MQTT_USER').value +"\n" +"PASSWORD: " + document.getElementById('MQTT_PASS').value);
+	document.getElementById('MQTT_IP').disabled = true;
+	document.getElementById('MQTT_USER').disabled = true;
+	document.getElementById('MQTT_PASS').disabled = true;
+	document.getElementById('MQTT_EDIT').hidden = false;
+	document.getElementById('MQTT_SUBMIT').hidden = true;
+	getConnectionsConfiguration();
+}
+
+function editMQTTConf()
+{
+	document.getElementById('MQTT_IP').disabled = false;
+	document.getElementById('MQTT_USER').disabled = false;
+	document.getElementById('MQTT_PASS').disabled = false;
+	document.getElementById('MQTT_EDIT').hidden = true;
+	document.getElementById('MQTT_SUBMIT').hidden = false;
+	getConnectionsConfiguration();
 }
 
 
