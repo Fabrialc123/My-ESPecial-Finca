@@ -54,7 +54,7 @@ static esp_mqtt_client_handle_t client;
 //static int received_packs;
 
 static pthread_mutex_t mutex_MQTT_APP_MQTT_CONNECTED;
-static int MQTT_CONNECTED = 0;
+static short int MQTT_CONNECTED = 0;
 
 static TaskHandle_t MQTT_APP_TASK_HANDLE_TASK;
 static TaskHandle_t MQTT_APP_TASK_HANDLE_DATA_SENDER;
@@ -84,8 +84,8 @@ void mqtt_app_format_data(char *src){
 
 }
 
-int is_mqtt_connected(){
-	int aux;
+short int is_mqtt_connected(){
+	short int aux;
 
 	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
 	aux = MQTT_CONNECTED;
@@ -358,9 +358,11 @@ void mqtt_app_getID(char *id){
 	strcpy(id, MQTT_APP_PERSONAL_NAME);
 }
 
-void mqtt_app_get_conf(char *ip, char *user, char *pass){
+void mqtt_app_get_conf(char *ip, char *user, char *pass, short int *status){
 	strcpy(ip, MQTT_APP_HOST);
 	strcpy(user,MQTT_USER);
 	strcpy(pass,MQTT_PASSWD);
+
+	*status = is_mqtt_connected();
 }
 
