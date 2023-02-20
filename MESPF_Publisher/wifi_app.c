@@ -35,7 +35,7 @@ esp_netif_t* esp_netif_ap = NULL;
 
 pthread_mutex_t mutex_WIFI;
 
-static int WIFI_CONNECTED = 0;
+static short int WIFI_CONNECTED = -1;
 static int s_retry_num = 0;
 
 
@@ -61,7 +61,11 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 			case WIFI_EVENT_STA_CONNECTED:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
 				log_add("WIFI_EVENT_STA_CONNECTED\n");
-				led_rgb_http_server_started(); 	// YELLOW
+
+				pthread_mutex_lock(&mutex_WIFI);
+					WIFI_CONNECTED = 0;
+					led_rgb_http_server_started(); 	// YELLOW
+				pthread_mutex_unlock(&mutex_WIFI);
 
 				s_retry_num = 0;
 
@@ -76,7 +80,7 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 				log_add(dis_log);
 
 				pthread_mutex_lock(&mutex_WIFI);
-					WIFI_CONNECTED = 0;
+					WIFI_CONNECTED = -1;
 					led_rgb_test(); // RED
 				pthread_mutex_unlock(&mutex_WIFI);
 
@@ -167,8 +171,6 @@ static void wifi_app_soft_ap_config(void){
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     sprintf(WIFI_AP_SSID, "ESP32_%02x%02X%02X", mac[3], mac[4], mac[5]);
 
-    //strcpy(ap_config.ap.ssid,WIFI_AP_SSID);
-    //ap_config.ap.ssid = strtoul(WIFI_AP_SSID, NULL, 32);
     for(i = 0; i < 32;i++){
     	if (i <= strlen(WIFI_AP_SSID)){
     		ap_config.ap.ssid[i] = WIFI_AP_SSID[i];
@@ -260,8 +262,8 @@ BaseType_t wifi_app_send_message(wifi_app_msg_e msgID){
 	return xQueueSend(wifi_app_queue_handle, &msg, portMAX_DELAY);
 }
 
-int is_wifi_connected(){
-	int result ;
+short int is_wifi_connected(){
+	short int result ;
 
 pthread_mutex_lock(&mutex_WIFI);
 	result = WIFI_CONNECTED;
@@ -286,7 +288,7 @@ void wifi_app_start(void){
 
 	xTaskCreatePinnedToCore(&wifi_app_task, "wifi_app_task", WIFI_APP_TASK_STACK_SIZE, NULL, WIFI_APP_TASK_PRIORITY, NULL, WIFI_APP_TASK_CORE_ID);
 
-	while(!is_wifi_connected()){
+	while(is_wifi_connected() != 1){
 		vTaskDelay(10);
 	}
 
@@ -304,9 +306,11 @@ void wifi_app_getIP(char *ip){
 	}
 }
 
-void wifi_app_get_conf(char *ssid, char *pass){
+void wifi_app_get_conf(char *ssid, char *pass , short int *status){
 	strcpy(ssid,WIFI_STA_SSID);
 	strcpy(pass,WIFI_STA_PASSWORD);
+
+	*status = is_wifi_connected();
 }
 
 
