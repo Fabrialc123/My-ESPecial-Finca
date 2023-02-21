@@ -24,16 +24,22 @@ function getConnectionsConfiguration()
      	
 		document.getElementById("WIFI_SSID").value = response.WIFI_SSID;
 		document.getElementById("WIFI_PASS").value = response.WIFI_PASS;
-		if (response.WIFI_STATUS == 1) document.getElementById("WIFI_STATUS").style.color = 'green';
-		else if (response.WIFI_STATUS == 0) document.getElementById("WIFI_STATUS").style.color = 'red';
-		else document.getElementById("WIFI_STATUS").style.color = 'yellow';
+		if (response.WIFI_STATUS == 1) document.getElementById("WIFI_STATUS").style.backgroundColor = 'green';
+		else if (response.WIFI_STATUS == 0) document.getElementById("WIFI_STATUS").style.backgroundColor = 'red';
+		else document.getElementById("WIFI_STATUS").style.backgroundColor = 'yellow';
+		
+		document.getElementById("NTP_SERVER").value = response.NTP_SERVER;
+		document.getElementById("NTP_SYNC").value = response.NTP_SYNC/1000;
+		if (response.NTP_STATUS == 1) document.getElementById("NTP_STATUS").style.backgroundColor = 'green';
+		else if (response.NTP_STATUS == 0) document.getElementById("NTP_STATUS").style.backgroundColor = 'red';
+		else document.getElementById("NTP_STATUS").style.backgroundColor = 'yellow';		
 		
 		document.getElementById("MQTT_IP").value = response.MQTT_IP;
 		document.getElementById("MQTT_USER").value = response.MQTT_USER;
 		document.getElementById("MQTT_PASS").value = response.MQTT_PASS;
-		if (response.MQTT_STATUS == 1) document.getElementById("MQTT_STATUS").style.color = 'green';
-		else if (response.MQTT_STATUS == 0) document.getElementById("MQTT_STATUS").style.color = 'red';
-		else document.getElementById("MQTT_STATUS").style.color = 'yellow';
+		if (response.MQTT_STATUS == 1) document.getElementById("MQTT_STATUS").style.backgroundColor = 'green';
+		else if (response.MQTT_STATUS == 0) document.getElementById("MQTT_STATUS").style.backgroundColor = 'red';
+		else document.getElementById("MQTT_STATUS").style.backgroundColor = 'yellow';
 	}
 }
    
@@ -159,6 +165,25 @@ function editWifiConf()
 	document.getElementById('WIFI_PASS').disabled = false;
 	document.getElementById('WIFI_EDIT').hidden = true;
 	document.getElementById('WIFI_SUBMIT').hidden = false;
+	getConnectionsConfiguration();
+}
+
+function submitNTPConf()
+{
+	window.alert("NTP Server: " + document.getElementById('NTP_SERVER').value + "\n" + "Sync time (secs): " + document.getElementById('NTP_SYNC').value + "\n");
+	document.getElementById('NTP_SERVER').disabled = true;
+	document.getElementById("NTP_SYNC").disabled = true;
+	document.getElementById('NTP_EDIT').hidden = false;
+	document.getElementById('NTP_SUBMIT').hidden = true;
+	getConnectionsConfiguration();
+}
+
+function editNTPConf()
+{
+	document.getElementById('NTP_SERVER').disabled = false;
+	document.getElementById("NTP_SYNC").disabled = false;
+	document.getElementById('NTP_EDIT').hidden = true;
+	document.getElementById('NTP_SUBMIT').hidden = false;
 	getConnectionsConfiguration();
 }
 

@@ -68,8 +68,12 @@ input[type="button"]:active {
                 inset 2px 2px 3px rgba(0, 0, 0, .6);
 }
 
-#WIFI_STATUS, #MQTT_STATUS{
-	display: inline;
+.dot {
+  height: 10px;
+  width: 10px;
+  background-color: #bbb;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 
