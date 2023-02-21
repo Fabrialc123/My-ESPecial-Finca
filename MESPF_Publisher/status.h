@@ -24,6 +24,9 @@ void status_start();
 bool status_getDateTime(char *dt);
 int status_setDateTime(const char *date,const char *time);
 
+void status_ntp_get_conf(char *server, unsigned int *sync_interval, short int *status);
+void status_ntp_set_conf(const char *server, const unsigned int sync_interval);
+
 sensor_data_t status_recollecter (void);
 
 

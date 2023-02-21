@@ -43,7 +43,28 @@ static void initialize_sntp(void)
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
         vTaskDelay(500);
     }
+
+
     ESP_LOGI(TAG2, "Received response from NTP Server!");
+}
+
+void status_ntp_get_conf(char *server, unsigned int *sync_interval, short int *status){
+
+	strcpy(server,sntp_getservername(0));
+	*sync_interval = sntp_get_sync_interval();
+    if (sntp_get_sync_status() == SNTP_SYNC_STATUS_IN_PROGRESS) *status = 0;
+    else *status = 1;
+
+}
+
+void status_ntp_set_conf(const char *server, const unsigned int sync_interval){
+	sntp_stop();
+
+	sntp_setservername(0, server);
+	if (sync_interval < 15) sntp_set_sync_interval(15000); // Min is 15 secs
+	else sntp_set_sync_interval(sync_interval * 1000);
+
+	sntp_init();
 }
 
 void status_start(){
