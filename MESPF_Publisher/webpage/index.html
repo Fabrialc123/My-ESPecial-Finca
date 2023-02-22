@@ -16,8 +16,8 @@
 	
 	<div id="WIFI_CONF">
 	<h2 id="configuration">WIFI Configuration</h2> <span class="dot" id="WIFI_STATUS"></span> <br>
-		<label>SSID: <input type="text" id="WIFI_SSID" name="WIFI_SSID" disabled/></label>
-		<label>PASSWORD: <input type="text" id="WIFI_PASS" name="WIFI_PASS" disabled/></label>
+		<label>SSID: <input type="text" id="WIFI_SSID" name="WIFI_SSID" maxlength="32" disabled/></label>
+		<label>Password: <input type="text" id="WIFI_PASS" name="WIFI_PASS" maxlength="64" disabled/></label>
 		<input type="button" value="Submit" id="WIFI_SUBMIT" onclick="submitWifiConf();" hidden> 
 		<input type="button" value="Edit" id="WIFI_EDIT" onclick="editWifiConf();">
 	</div>
@@ -25,8 +25,8 @@
 	
 	<div id="NTP_CONF">
 	<h2 id="configuration">NTP Configuration</h2> <span class="dot" id="NTP_STATUS"></span> <br>
-		<label>NTP Server: <input type="text" id="NTP_SERVER" name="NTP_SERVER" disabled/></label>
-		<label>Sync time (secs): <input type="number" id="NTP_SYNC" name="NTP_SYNC" disabled/></label>
+		<label>NTP Server: <input type="text" id="NTP_SERVER" name="NTP_SERVER" maxlength="32" disabled/></label>
+		<label>Sync time (secs): <input type="number" id="NTP_SYNC" name="NTP_SYNC" min="15" max="99999" disabled/></label>
 		<input type="button" value="Submit" id="NTP_SUBMIT" onclick="submitNTPConf();" hidden> 
 		<input type="button" value="Edit" id="NTP_EDIT" onclick="editNTPConf();">
 	</div>
@@ -34,9 +34,9 @@
 	
 	<div id="MQTT_CONF">
 	<h2 id="configuration">MQTT Configuration</h2> <span class="dot" id="MQTT_STATUS"></span> <br>
-		<label>BROKER IP: <input type="text" id="MQTT_IP" name="MQTT_IP" disabled/></label>
-		<label>USERNAME: <input type="text" id="MQTT_USER" name="MQTT_USER" disabled/></label>
-		<label>PASSWORD: <input type="text" id="MQTT_PASS" name="MQTT_PASS"disabled/></label>
+		<label>Broker IP: <input type="text" id="MQTT_IP" name="MQTT_IP" maxlength="32" disabled/></label>
+		<label>Username: <input type="text" id="MQTT_USER" name="MQTT_USER" maxlength="32" disabled/></label>
+		<label>Password: <input type="text" id="MQTT_PASS" name="MQTT_PASS" maxlength="64" disabled/></label>
 		<input type="button" value="Submit" id="MQTT_SUBMIT" onclick="submitMQTTConf();" hidden> 
 		<input type="button" value="Edit" id="MQTT_EDIT" onclick="editMQTTConf();">		
 	</div>
