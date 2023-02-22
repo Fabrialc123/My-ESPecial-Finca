@@ -114,7 +114,7 @@ static void http_server_monitor(void *pvParameters){
 
 
 static esp_err_t http_server_jquery_handler(httpd_req_t *req){
-	ESP_LOGI(TAG, "JQuery Requested");
+	//ESP_LOGI(TAG, "JQuery Requested");
 
 	httpd_resp_set_type(req, "application/javascript"); // To see other types go above to the function definition in esp_http_server.h
 	httpd_resp_send(req, (const char *) jquery_3_3_1_min_js_start, jquery_3_3_1_min_js_end - jquery_3_3_1_min_js_start);
@@ -123,7 +123,7 @@ static esp_err_t http_server_jquery_handler(httpd_req_t *req){
 }
 
 static esp_err_t http_server_index_html_handler(httpd_req_t *req){
-	ESP_LOGI(TAG, "index.html Requested");
+	//ESP_LOGI(TAG, "index.html Requested");
 
 	httpd_resp_set_type(req, HTTPD_TYPE_TEXT); // To see other types go above to the function definition in esp_http_server.h
 	httpd_resp_send(req, (const char *) index_html_start, index_html_end - index_html_start);
@@ -132,7 +132,7 @@ static esp_err_t http_server_index_html_handler(httpd_req_t *req){
 }
 
 static esp_err_t http_server_app_css_handler(httpd_req_t *req){
-	ESP_LOGI(TAG, "app.css Requested");
+	//ESP_LOGI(TAG, "app.css Requested");
 
 	httpd_resp_set_type(req, "text/css"); // To see other types go above to the function definition in esp_http_server.h
 	httpd_resp_send(req, (const char *) app_css_start, app_css_end - app_css_start);
@@ -141,7 +141,7 @@ static esp_err_t http_server_app_css_handler(httpd_req_t *req){
 }
 
 static esp_err_t http_server_app_js_handler(httpd_req_t *req){
-	ESP_LOGI(TAG, "app.js Requested");
+	//ESP_LOGI(TAG, "app.js Requested");
 
 	httpd_resp_set_type(req, "application/javascript"); // To see other types go above to the function definition in esp_http_server.h
 	httpd_resp_send(req, (const char *) app_js_start, app_js_end - app_js_start);
@@ -232,7 +232,7 @@ static esp_err_t http_server_OTA_update_handler(httpd_req_t *req){
 static esp_err_t http_server_OTA_status_handler(httpd_req_t *req){
 	char otaJSON[100];
 
-	ESP_LOGI(TAG, "OTAstatus requested");
+	//ESP_LOGI(TAG, "OTAstatus requested");
 
 	sprintf(otaJSON, "{\"ota_update_status\":%d,\"compile_time\":\"%s\",\"compile_date\":\"%s\"}", g_fw_update_status, __TIME__, __DATE__);
 
@@ -261,7 +261,7 @@ static esp_err_t ConnectionsConfiguration_handler(httpd_req_t *req){
 	char mqtt_ip[32],mqtt_user[32],mqtt_pass[64];
 	unsigned int ntp_sync;
 
-	ESP_LOGI(TAG, "ConnectionsConfiguration requested");
+	//ESP_LOGI(TAG, "ConnectionsConfiguration requested");
 
 	wifi_app_get_conf(wifi_ssid, wifi_pass, &wifi_status);
 	status_ntp_get_conf(ntp_server, &ntp_sync, &ntp_status);
@@ -269,12 +269,36 @@ static esp_err_t ConnectionsConfiguration_handler(httpd_req_t *req){
 
 	sprintf(ConnConf, "{\"WIFI_SSID\":\"%s\",\"WIFI_PASS\":\"%s\",\"WIFI_STATUS\":%d,\"NTP_SERVER\":\"%s\",\"NTP_STATUS\":%d,\"NTP_SYNC\":%d,\"MQTT_IP\":\"%s\",\"MQTT_USER\":\"%s\",\"MQTT_PASS\":\"%s\",\"MQTT_STATUS\":%d}", wifi_ssid, wifi_pass, wifi_status, ntp_server, ntp_status, ntp_sync,mqtt_ip, mqtt_user, mqtt_pass, mqtt_status);
 
+	//ESP_LOGE("TESTING","%s",ConnConf);
+
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
 	httpd_resp_send(req, ConnConf, strlen(ConnConf));
 
 
 	return ESP_OK;
 }
+
+static esp_err_t setNTPConfiguration_handler(httpd_req_t *req){
+	char buf[64], *server, response[30];
+	int recv_len, sync_time;
+	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
+
+	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
+	else {
+		server = strtok(buf,"\n");
+		sync_time = atoi(strtok(NULL,"\n"));
+		status_ntp_set_conf(server,sync_time);
+
+		sprintf(response,"Restarted NTP Service");
+	}
+
+	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+	httpd_resp_send(req, response, strlen(response));
+
+	return ESP_OK;
+}
+
+
 /**
  * Sets up default httpd server configuration
  * @return http server instance handle if successful, NULL otherwise
@@ -364,6 +388,14 @@ static httpd_handle_t http_server_configure(void){
 	        .user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &ConnectionsConfiguration));
+
+	    httpd_uri_t setNTPConfiguration = {
+	        .uri = "/setNTPConfiguration",
+	        .method = HTTP_POST,
+	        .handler = setNTPConfiguration_handler,
+	        .user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &setNTPConfiguration));
 
 		return http_server_handle;
 	}

@@ -22,7 +22,18 @@ static const char TAG2[] = "STATUS";
 time_t start;
 double upTimeAGG = 0;
 
+static char NTP_SERVER[64];
+static short int NTP_STATUS = -1;
+
 static pthread_mutex_t mutex_STATUS;
+
+void time_sync_notification_cb(struct timeval *tv)
+{
+    ESP_LOGI(TAG2, "Time Sync Event!");
+	pthread_mutex_lock(&mutex_STATUS);
+		NTP_STATUS = 1;
+	pthread_mutex_unlock(&mutex_STATUS);
+}
 
 static void initialize_sntp(void)
 {
@@ -31,36 +42,47 @@ static void initialize_sntp(void)
     //sntp_setservername(0, "192.168.3.51");
     sntp_setservername(0, NTP_SERVERNAME);
     //sntp_setservername(0, "pool.ntp.org");
-    //sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
     //sntp_set_sync_interval(1*3600*1000);
     sntp_set_sync_interval(NTP_SECSTOSYNC*1000);
 
+
+    sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     sntp_init();
 
     ESP_LOGI(TAG2, "Waiting response from NTP Server...");
-    vTaskDelay(1000);
+    vTaskDelay(50);
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
-        vTaskDelay(500);
+        vTaskDelay(50);
     }
 
-
+	pthread_mutex_lock(&mutex_STATUS);
+		strcpy(NTP_SERVER,NTP_SERVERNAME);
+	pthread_mutex_unlock(&mutex_STATUS);
     ESP_LOGI(TAG2, "Received response from NTP Server!");
+
 }
 
 void status_ntp_get_conf(char *server, unsigned int *sync_interval, short int *status){
-
 	strcpy(server,sntp_getservername(0));
 	*sync_interval = sntp_get_sync_interval();
-    if (sntp_get_sync_status() == SNTP_SYNC_STATUS_IN_PROGRESS) *status = 0;
-    else *status = 1;
+
+	pthread_mutex_lock(&mutex_STATUS);
+		*status = NTP_STATUS;
+	pthread_mutex_unlock(&mutex_STATUS);
 
 }
 
 void status_ntp_set_conf(const char *server, const unsigned int sync_interval){
 	sntp_stop();
 
-	sntp_setservername(0, server);
+	pthread_mutex_lock(&mutex_STATUS);
+		strcpy(NTP_SERVER,server);
+		NTP_STATUS = 0;
+	pthread_mutex_unlock(&mutex_STATUS);
+
+	sntp_setservername(0, NTP_SERVER); // *server will be deleted after the statement!
+
 	if (sync_interval < 15) sntp_set_sync_interval(15000); // Min is 15 secs
 	else sntp_set_sync_interval(sync_interval * 1000);
 
