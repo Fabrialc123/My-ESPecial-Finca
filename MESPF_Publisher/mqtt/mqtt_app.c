@@ -47,13 +47,15 @@ static const char TAG[] = "MQTT_APP";
 
 char *MQTT_APP_PERSONAL_NAME;
 
+static char MQTT_APP_HOST[32] = "192.168.0.10";
+static int MQTT_APP_PORT = 1883;
+static char MQTT_USER[32] = "MESPF_USER";
+static char	MQTT_PASSWD[64] = "MESPF_USER";
+
 static QueueHandle_t mqtt_app_queue_handle;
 static esp_mqtt_client_handle_t client;
 
-//static int sended_packs;
-//static int received_packs;
-
-static pthread_mutex_t mutex_MQTT_APP_MQTT_CONNECTED;
+static pthread_mutex_t mutex_MQTT_APP;
 static short int MQTT_CONNECTED = 0;
 
 static TaskHandle_t MQTT_APP_TASK_HANDLE_TASK;
@@ -87,9 +89,9 @@ void mqtt_app_format_data(char *src){
 short int is_mqtt_connected(){
 	short int aux;
 
-	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+	pthread_mutex_lock(&mutex_MQTT_APP);
 	aux = MQTT_CONNECTED;
-	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+	pthread_mutex_unlock(&mutex_MQTT_APP);
 
 	return aux;
 }
@@ -154,9 +156,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
         memset(&topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
 
-    	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+    	pthread_mutex_lock(&mutex_MQTT_APP);
     	MQTT_CONNECTED = 1;
-    	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
+    	pthread_mutex_unlock(&mutex_MQTT_APP);
 
 
 		/*strcpy(aux,MQTT_APP_COMMANDS_TOPIC);
@@ -174,15 +176,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-        	pthread_mutex_lock(&mutex_MQTT_APP_MQTT_CONNECTED);
+        	pthread_mutex_lock(&mutex_MQTT_APP);
         	MQTT_CONNECTED = -1;
-        	pthread_mutex_unlock(&mutex_MQTT_APP_MQTT_CONNECTED);
-
-        	/*
-			ESP_LOGE(TAG, "Retrying reconnect in %d seconds...", MQTT_APP_SECONDS_TO_RECONNECT/100);
-			vTaskDelay(MQTT_APP_SECONDS_TO_RECONNECT);
-			esp_mqtt_client_reconnect(client);
-			*/
+        	pthread_mutex_unlock(&mutex_MQTT_APP);
 
         break;
 
@@ -244,18 +240,13 @@ static void mqtt_app_task(void *pvParameters){
     };
 */
     esp_mqtt_client_config_t mqtt_cfg = {
-#ifdef MQTT_APP_HOST
     	.host = MQTT_APP_HOST,
-#else
-        .uri = MQTT_APP_URI,
-#endif
 		.port = MQTT_APP_PORT,
 		.username = MQTT_USER,
 		.password = MQTT_PASSWD,
 
 		.disable_auto_reconnect = 0,
 		.reconnect_timeout_ms = MQTT_APP_MLSECS_TO_RECONNECT,
-
     };
 
     ESP_LOGE(TAG,"STACK SIZE: %d / %d",uxTaskGetStackHighWaterMark(NULL), MQTT_APP_TASK_STACK_SIZE);
@@ -270,9 +261,7 @@ static void mqtt_app_task(void *pvParameters){
 			switch(msg.msgID){
 				case MQTT_APP_MSG_PUBLISH_DATA:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_PUBLISH_DATA to topic %s",msg.src);
-
 					mqtt_app_format_data(msg.data);
-
 					if (is_mqtt_connected()){
 						esp_mqtt_client_publish(client, msg.src, msg.data, 0, MQTT_APP_QOS, 0);
 						ESP_LOGI(TAG, "sent publish successful");
@@ -292,14 +281,12 @@ static void mqtt_app_task(void *pvParameters){
 
 				case MQTT_APP_MSG_DISCONNECT:
 					ESP_LOGE(TAG, "MQTT_APP_MSG_DISCONNECT");
-
 					mqtt_app_disconnect();
 
 					break;
 
 				case MQTT_APP_MSG_PROCESS_COMMAND:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_PROCESS_COMMAND");
-
 					mqtt_app_process_command(msg.src,msg.data);
 
 					break;
@@ -337,7 +324,7 @@ void mqtt_app_start(void)
 //    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
 //    esp_log_level_set("outbox", ESP_LOG_VERBOSE);
 
-	if(pthread_mutex_init (&mutex_MQTT_APP_MQTT_CONNECTED, NULL) != 0){
+	if(pthread_mutex_init (&mutex_MQTT_APP, NULL) != 0){
 	 ESP_LOGE(TAG,"Failed to initialize the MQTT_CONNECTED mutex");
 	}
 
@@ -358,11 +345,45 @@ void mqtt_app_getID(char *id){
 	strcpy(id, MQTT_APP_PERSONAL_NAME);
 }
 
-void mqtt_app_get_conf(char *ip, char *user, char *pass, short int *status){
-	strcpy(ip, MQTT_APP_HOST);
-	strcpy(user,MQTT_USER);
-	strcpy(pass,MQTT_PASSWD);
+void mqtt_app_get_conf(char *ip, int *port,char *user, char *pass, short int *status){
+	pthread_mutex_lock(&mutex_MQTT_APP);
+		strcpy(ip, MQTT_APP_HOST);
+		strcpy(user,MQTT_USER);
+		strcpy(pass,MQTT_PASSWD);
+		*port = MQTT_APP_PORT;
 
-	*status = is_mqtt_connected();
+		*status = MQTT_CONNECTED;
+	pthread_mutex_unlock(&mutex_MQTT_APP);
+}
+
+void mqtt_app_set_conf(const char *ip, const int port,const char *user, const char *pass){
+	pthread_mutex_lock(&mutex_MQTT_APP);
+		strcpy(MQTT_APP_HOST,ip);
+		MQTT_APP_PORT = port;
+		strcpy(MQTT_USER,user);
+		strcpy(MQTT_PASSWD,pass);
+
+		esp_mqtt_client_config_t mqtt_cfg = {
+			.host = MQTT_APP_HOST,
+			.port = MQTT_APP_PORT,
+			.username = MQTT_USER,
+			.password = MQTT_PASSWD,
+
+			.disable_auto_reconnect = 0,
+			.reconnect_timeout_ms = MQTT_APP_MLSECS_TO_RECONNECT,
+
+		};
+
+		MQTT_CONNECTED = 0;
+	pthread_mutex_unlock(&mutex_MQTT_APP);
+	//ESP_LOGE(TAG,"mqtt_app_set_conf: Status set!");
+
+	esp_mqtt_client_stop(client);
+	//ESP_LOGE(TAG,"mqtt_app_set_conf: Client Stopped!");
+	esp_mqtt_set_config(client, &mqtt_cfg);
+	//ESP_LOGE(TAG,"mqtt_app_set_conf: Config set!");
+	esp_mqtt_client_start(client);
+	//ESP_LOGE(TAG,"mqtt_app_set_conf: Client started!");
+
 }
 
