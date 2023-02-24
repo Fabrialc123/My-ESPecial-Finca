@@ -254,20 +254,21 @@ static esp_err_t log_get_handler(httpd_req_t *req)
 }
 
 static esp_err_t ConnectionsConfiguration_handler(httpd_req_t *req){
-	char ConnConf[420];
+	char ConnConf[430];
 	char wifi_ssid[32],wifi_pass[64];
 	short int wifi_status, ntp_status, mqtt_status;
 	char ntp_server[32];
 	char mqtt_ip[32],mqtt_user[32],mqtt_pass[64];
 	unsigned int ntp_sync;
+	int mqtt_port;
 
 	//ESP_LOGI(TAG, "ConnectionsConfiguration requested");
 
 	wifi_app_get_conf(wifi_ssid, wifi_pass, &wifi_status);
 	status_ntp_get_conf(ntp_server, &ntp_sync, &ntp_status);
-	mqtt_app_get_conf(mqtt_ip, mqtt_user, mqtt_pass, &mqtt_status);
+	mqtt_app_get_conf(mqtt_ip, &mqtt_port,mqtt_user, mqtt_pass, &mqtt_status);
 
-	sprintf(ConnConf, "{\"WIFI_SSID\":\"%s\",\"WIFI_PASS\":\"%s\",\"WIFI_STATUS\":%d,\"NTP_SERVER\":\"%s\",\"NTP_STATUS\":%d,\"NTP_SYNC\":%d,\"MQTT_IP\":\"%s\",\"MQTT_USER\":\"%s\",\"MQTT_PASS\":\"%s\",\"MQTT_STATUS\":%d}", wifi_ssid, wifi_pass, wifi_status, ntp_server, ntp_status, ntp_sync,mqtt_ip, mqtt_user, mqtt_pass, mqtt_status);
+	sprintf(ConnConf, "{\"WIFI_SSID\":\"%s\",\"WIFI_PASS\":\"%s\",\"WIFI_STATUS\":%d,\"NTP_SERVER\":\"%s\",\"NTP_STATUS\":%d,\"NTP_SYNC\":%d,\"MQTT_IP\":\"%s\",\"MQTT_PORT\":%d,\"MQTT_USER\":\"%s\",\"MQTT_PASS\":\"%s\",\"MQTT_STATUS\":%d}", wifi_ssid, wifi_pass, wifi_status, ntp_server, ntp_status, ntp_sync,mqtt_ip, mqtt_port, mqtt_user, mqtt_pass, mqtt_status);
 
 	//ESP_LOGE("TESTING","%s",ConnConf);
 
@@ -290,6 +291,29 @@ static esp_err_t setNTPConfiguration_handler(httpd_req_t *req){
 		status_ntp_set_conf(server,sync_time);
 
 		sprintf(response,"Restarted NTP Service");
+	}
+
+	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+	httpd_resp_send(req, response, strlen(response));
+
+	return ESP_OK;
+}
+
+static esp_err_t setMQTTConfiguration_handler(httpd_req_t *req){
+	char buf[140], *ip, *username, *pass, response[30];
+	int recv_len, port;
+	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
+
+	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
+	else {
+		ip = strtok(buf,"\n");
+		port = atoi(strtok(NULL,"\n"));
+		username = strtok(NULL,"\n");
+		pass = strtok(NULL,"\n");
+
+		mqtt_app_set_conf(ip,port,username,pass);
+ESP_LOGE(TAG,"setMQTTConfiguration_handler: mqtt_app_set_conf OK!");
+		sprintf(response,"Restarted MQTT Service");
 	}
 
 	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
@@ -396,6 +420,14 @@ static httpd_handle_t http_server_configure(void){
 	        .user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &setNTPConfiguration));
+
+	    httpd_uri_t setMQTTConfiguration = {
+	        .uri = "/setMQTTConfiguration",
+	        .method = HTTP_POST,
+	        .handler = setMQTTConfiguration_handler,
+	        .user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &setMQTTConfiguration));
 
 		return http_server_handle;
 	}
