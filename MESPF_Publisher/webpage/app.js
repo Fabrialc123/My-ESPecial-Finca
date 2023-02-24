@@ -35,6 +35,7 @@ function getConnectionsConfiguration()
 		else document.getElementById("NTP_STATUS").style.backgroundColor = 'red';		
 		
 		document.getElementById("MQTT_IP").value = response.MQTT_IP;
+		document.getElementById("MQTT_PORT").value = response.MQTT_PORT;
 		document.getElementById("MQTT_USER").value = response.MQTT_USER;
 		document.getElementById("MQTT_PASS").value = response.MQTT_PASS;
 		if (response.MQTT_STATUS == 1) document.getElementById("MQTT_STATUS").style.backgroundColor = 'green';
@@ -199,8 +200,20 @@ function editNTPConf()
 
 function submitMQTTConf()
 {
-	window.alert("IP: " + document.getElementById('MQTT_IP').value + "\n" + "USER: " + document.getElementById('MQTT_USER').value +"\n" +"PASSWORD: " + document.getElementById('MQTT_PASS').value);
+	var xhr = new XMLHttpRequest();
+    var requestURL = "/setMQTTConfiguration";		//setMQTTConfiguration has to be handled
+    xhr.open('POST', requestURL, false);
+    xhr.send(document.getElementById('MQTT_IP').value + "\n" 
+    		+ document.getElementById('MQTT_PORT').value + "\n"
+    		+ document.getElementById('MQTT_USER').value + "\n"
+    		+ document.getElementById('MQTT_PASS').value + "\0");
+    
+    if (xhr.readyState == 4 && xhr.status == 200) {
+    	window.alert(xhr.responseText);
+    }
+    
 	document.getElementById('MQTT_IP').disabled = true;
+	document.getElementById('MQTT_PORT').disabled = true;
 	document.getElementById('MQTT_USER').disabled = true;
 	document.getElementById('MQTT_PASS').disabled = true;
 	document.getElementById('MQTT_EDIT').hidden = false;
@@ -211,6 +224,7 @@ function submitMQTTConf()
 function editMQTTConf()
 {
 	document.getElementById('MQTT_IP').disabled = false;
+	document.getElementById('MQTT_PORT').disabled = false;
 	document.getElementById('MQTT_USER').disabled = false;
 	document.getElementById('MQTT_PASS').disabled = false;
 	document.getElementById('MQTT_EDIT').hidden = true;

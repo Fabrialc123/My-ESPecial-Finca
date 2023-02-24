@@ -35,6 +35,7 @@
 	<div id="MQTT_CONF">
 	<h2 id="configuration">MQTT Configuration</h2> <span class="dot" id="MQTT_STATUS"></span> <br>
 		<label>Broker IP: <input type="text" id="MQTT_IP" name="MQTT_IP" maxlength="32" disabled/></label>
+		<label>Broker Port: <input type="number" id="MQTT_PORT" name="MQTT_PORT" min="0" max="99999" disabled/></label>
 		<label>Username: <input type="text" id="MQTT_USER" name="MQTT_USER" maxlength="32" disabled/></label>
 		<label>Password: <input type="text" id="MQTT_PASS" name="MQTT_PASS" maxlength="64" disabled/></label>
 		<input type="button" value="Submit" id="MQTT_SUBMIT" onclick="submitMQTTConf();" hidden> 
