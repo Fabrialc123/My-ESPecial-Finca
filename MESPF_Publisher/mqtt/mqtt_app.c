@@ -36,21 +36,27 @@
 
 #include <pthread.h>
 
-#include "mqtt_topics.h"
-#include "task_common.h"
-#include "recollecter.h"
+#include <mqtt/mqtt_topics.h>
+#include <mqtt/mqtt_commands.h>
+#include <task_common.h>
+#include <recollecter.h>
 
-#include "mqtt_commands.h"
-#include "status.h"
+#include <status.h>
+
+#include <nvs_app.h>
 
 static const char TAG[] = "MQTT_APP";
 
 char *MQTT_APP_PERSONAL_NAME;
 
-static char MQTT_APP_HOST[32] = "192.168.0.10";
-static int MQTT_APP_PORT = 1883;
-static char MQTT_USER[32] = "MESPF_USER";
-static char	MQTT_PASSWD[64] = "MESPF_USER";
+#define nvs_MQTT_APP_HOST_key	"mqtt_host"
+static char nvs_MQTT_APP_HOST[32] = "";
+#define nvs_MQTT_APP_PORT_key	"mqtt_port"
+static uint32_t nvs_MQTT_APP_PORT = 1883;
+#define nvs_MQTT_USER_key		"mqtt_user"
+static char nvs_MQTT_USER[32] = "";
+#define nvs_MQTT_PASSWD_key		"mqtt_pass"
+static char	nvs_MQTT_PASSWD[64] = "";
 
 static QueueHandle_t mqtt_app_queue_handle;
 static esp_mqtt_client_handle_t client;
@@ -133,16 +139,6 @@ static void mqtt_app_data_sender (void *pvParameters){
 	 }
 }
 
-/*
- * @brief Event handler registered to receive MQTT events
- *
- *  This function is called by the MQTT client event loop.
- *
- * @param handler_args user data registered to the event.
- * @param base Event base for the handler(always MQTT Base in this example).
- * @param event_id The id for the received event.
- * @param event_data The data for the event, esp_mqtt_event_handle_t.
- */
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
 	int msg_id;
@@ -234,16 +230,28 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 static void mqtt_app_task(void *pvParameters){
 	mqtt_app_queue_msg_t msg;
+	size_t size;
 	/*
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = "broker.hivemq.com",
     };
 */
+	nvs_app_get_string_value(nvs_MQTT_APP_HOST_key,NULL,&size);
+	if (size <= 32) nvs_app_get_string_value(nvs_MQTT_APP_HOST_key,nvs_MQTT_APP_HOST,&size);
+
+	nvs_app_get_uint32_value(nvs_MQTT_APP_PORT_key,&nvs_MQTT_APP_PORT);
+
+	nvs_app_get_string_value(nvs_MQTT_USER_key,NULL,&size);
+	if (size <= 32) nvs_app_get_string_value(nvs_MQTT_USER_key,nvs_MQTT_USER,&size);
+
+	nvs_app_get_string_value(nvs_MQTT_PASSWD_key,NULL,&size);
+	if (size <= 64) nvs_app_get_string_value(nvs_MQTT_PASSWD_key,nvs_MQTT_PASSWD,&size);
+
     esp_mqtt_client_config_t mqtt_cfg = {
-    	.host = MQTT_APP_HOST,
-		.port = MQTT_APP_PORT,
-		.username = MQTT_USER,
-		.password = MQTT_PASSWD,
+    	.host = nvs_MQTT_APP_HOST,
+		.port = nvs_MQTT_APP_PORT,
+		.username = nvs_MQTT_USER,
+		.password = nvs_MQTT_PASSWD,
 
 		.disable_auto_reconnect = 0,
 		.reconnect_timeout_ms = MQTT_APP_MLSECS_TO_RECONNECT,
@@ -333,12 +341,12 @@ void mqtt_app_start(void)
     mqtt_app_queue_handle = xQueueCreate(MQTT_APP_QUEUE_HANDLE_SIZE, sizeof(mqtt_app_queue_msg_t));
 
     xTaskCreatePinnedToCore(&mqtt_app_task, "mqtt_app_task", MQTT_APP_TASK_STACK_SIZE, NULL, MQTT_APP_TASK_PRIORITY, &MQTT_APP_TASK_HANDLE_TASK, MQTT_APP_TASK_CORE_ID);
-
+/*
     ESP_LOGI(TAG,"Waiting for mqtt broker connection");
     while(!is_mqtt_connected()){
-    	vTaskDelay(10);
+    	vTaskDelay(100);
     }
-
+*/
 }
 
 void mqtt_app_getID(char *id){
@@ -347,10 +355,10 @@ void mqtt_app_getID(char *id){
 
 void mqtt_app_get_conf(char *ip, int *port,char *user, char *pass, short int *status){
 	pthread_mutex_lock(&mutex_MQTT_APP);
-		strcpy(ip, MQTT_APP_HOST);
-		strcpy(user,MQTT_USER);
-		strcpy(pass,MQTT_PASSWD);
-		*port = MQTT_APP_PORT;
+		strcpy(ip, nvs_MQTT_APP_HOST);
+		strcpy(user, nvs_MQTT_USER);
+		strcpy(pass,nvs_MQTT_PASSWD);
+		*port = nvs_MQTT_APP_PORT;
 
 		*status = MQTT_CONNECTED;
 	pthread_mutex_unlock(&mutex_MQTT_APP);
@@ -358,32 +366,42 @@ void mqtt_app_get_conf(char *ip, int *port,char *user, char *pass, short int *st
 
 void mqtt_app_set_conf(const char *ip, const int port,const char *user, const char *pass){
 	pthread_mutex_lock(&mutex_MQTT_APP);
-		strcpy(MQTT_APP_HOST,ip);
-		MQTT_APP_PORT = port;
-		strcpy(MQTT_USER,user);
-		strcpy(MQTT_PASSWD,pass);
+		if(strcmp(nvs_MQTT_APP_HOST,ip) != 0){
+			strcpy(nvs_MQTT_APP_HOST,ip);
+			nvs_app_set_string_value(nvs_MQTT_APP_HOST_key,nvs_MQTT_APP_HOST);
+		}
+
+		if(nvs_MQTT_APP_PORT != port){
+			nvs_MQTT_APP_PORT = port;
+			nvs_app_set_uint32_value(nvs_MQTT_APP_PORT_key,nvs_MQTT_APP_PORT);
+		}
+
+		if(strcmp(nvs_MQTT_USER,user) != 0){
+			strcpy(nvs_MQTT_USER,user);
+			nvs_app_set_string_value(nvs_MQTT_USER_key,nvs_MQTT_USER);
+		}
+
+		if(strcmp(nvs_MQTT_PASSWD,user) != 0){
+			strcpy(nvs_MQTT_PASSWD,pass);
+			nvs_app_set_string_value(nvs_MQTT_PASSWD_key,nvs_MQTT_PASSWD);
+		}
+
 
 		esp_mqtt_client_config_t mqtt_cfg = {
-			.host = MQTT_APP_HOST,
-			.port = MQTT_APP_PORT,
-			.username = MQTT_USER,
-			.password = MQTT_PASSWD,
+			.host = nvs_MQTT_APP_HOST,
+			.port = nvs_MQTT_APP_PORT,
+			.username = nvs_MQTT_USER,
+			.password = nvs_MQTT_PASSWD,
 
 			.disable_auto_reconnect = 0,
 			.reconnect_timeout_ms = MQTT_APP_MLSECS_TO_RECONNECT,
 
 		};
-
 		MQTT_CONNECTED = 0;
 	pthread_mutex_unlock(&mutex_MQTT_APP);
-	//ESP_LOGE(TAG,"mqtt_app_set_conf: Status set!");
 
 	esp_mqtt_client_stop(client);
-	//ESP_LOGE(TAG,"mqtt_app_set_conf: Client Stopped!");
 	esp_mqtt_set_config(client, &mqtt_cfg);
-	//ESP_LOGE(TAG,"mqtt_app_set_conf: Config set!");
 	esp_mqtt_client_start(client);
-	//ESP_LOGE(TAG,"mqtt_app_set_conf: Client started!");
-
 }
 
