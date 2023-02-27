@@ -25,6 +25,7 @@
 #include <tcpip_adapter.h> // TO GET IP
 
 #include <log.h>
+#include <nvs_app.h>
 
 static const char TAG[] = "wifi_app";
 
@@ -35,17 +36,19 @@ esp_netif_t* esp_netif_ap = NULL;
 
 pthread_mutex_t mutex_WIFI;
 
+#define nvs_WIFI_STA_SSID_key	"wifi_ssid"
+static char nvs_WIFI_STA_SSID[32] = "EXAMPLE_SSID";
+#define nvs_WIFI_STA_PASSWORD_key	"wifi_pass"
+static char nvs_WIFI_STA_PASSWORD[64] = "EXAMPLE_PASSWORD";
+
+static char WIFI_AP_PASSWORD[64] = "MESPF123";
+
 static short int WIFI_CONNECTED = -1;
 static int s_retry_num = 0;
+static wifi_mode_t WIFI_MODE = WIFI_MODE_APSTA;
 
 
-/**
- * WiFi application event handler
- * @param arg data, aside from event data, that is passed to the handler when it is called
- * @param event_base the base id of the event to register the handler for
- * @param event_id the id of the event to register the handler for
- * @param event_data event data
- */
+
 static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
 	char dis_log[LOG_MSG_LEN];
 	wifi_event_sta_disconnected_t *data;
@@ -53,28 +56,35 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 		switch(event_id){
 			case WIFI_EVENT_STA_START:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_START");
-				log_add("WIFI_EVENT_STA_START\n");
+				log_add("WIFI_EVENT_STA_START \n");
 				led_rgb_wifi_app_started(); // WHITE
-				esp_wifi_connect();
+				wifi_app_send_message(WIFI_APP_MSG_CONNECT);
 				break;
 
 			case WIFI_EVENT_STA_CONNECTED:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
-				log_add("WIFI_EVENT_STA_CONNECTED\n");
+				log_add("WIFI_EVENT_STA_CONNECTED \n");
 
 				pthread_mutex_lock(&mutex_WIFI);
 					WIFI_CONNECTED = 0;
 					led_rgb_http_server_started(); 	// YELLOW
-				pthread_mutex_unlock(&mutex_WIFI);
+					s_retry_num = 0;
 
-				s_retry_num = 0;
+					if (WIFI_MODE == WIFI_MODE_APSTA || WIFI_MODE == WIFI_MODE_AP) {
+						WIFI_MODE = WIFI_MODE_STA;
+						s_retry_num = WIFI_MAX_CONN_RETRIES + 1;
+						wifi_app_send_message(WIFI_APP_MSG_DISCONNECT); // FORCING TO CHANGE MODE TO STA
+					}else {
+						s_retry_num = 0;
+					}
+				pthread_mutex_unlock(&mutex_WIFI);
 
 				break;
 
 			case WIFI_EVENT_STA_DISCONNECTED:
 
 				data = (wifi_event_sta_disconnected_t*) event_data;
-				ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
+				ESP_LOGE(TAG, "WIFI_EVENT_STA_DISCONNECTED, REASON: %d", data->reason);
 
 				sprintf(dis_log,"WIFI_EVENT_STA_DISCONNECTED, Reason: %d \n", data->reason);
 				log_add(dis_log);
@@ -82,21 +92,22 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 				pthread_mutex_lock(&mutex_WIFI);
 					WIFI_CONNECTED = -1;
 					led_rgb_test(); // RED
-				pthread_mutex_unlock(&mutex_WIFI);
 
-				if (s_retry_num < WIFI_MAX_CONN_RETRIES){
-					s_retry_num++;
-					ESP_LOGI(TAG," Retry %i to connect to the AP ", s_retry_num);
-					esp_wifi_connect();
-				} else if (s_retry_num == WIFI_MAX_CONN_RETRIES){
-					s_retry_num++;
-					esp_wifi_stop();
-				}
+					if (s_retry_num < WIFI_MAX_CONN_RETRIES){
+						s_retry_num++;
+						ESP_LOGI(TAG," Retry %i to connect to the AP ", s_retry_num);
+						wifi_app_send_message(WIFI_APP_MSG_CONNECT);
+					} else if (s_retry_num >= WIFI_MAX_CONN_RETRIES){
+						if (s_retry_num == WIFI_MAX_CONN_RETRIES) WIFI_MODE = WIFI_MODE_APSTA; // s_retry_num will be upper if disconnection were requested
+						wifi_app_send_message(WIFI_APP_MSG_STOP);
+					}
+
+				pthread_mutex_unlock(&mutex_WIFI);
 				break;
 
 			case WIFI_EVENT_STA_STOP:
 				ESP_LOGI(TAG, "WIFI_EVENT_STA_STOP");
-				log_add("WIFI STOP! Restarting...");
+				log_add("WIFI STOP! Restarting... \n");
 				wifi_app_send_message(WIFI_APP_MSG_RESTART);
 			break;
 		}
@@ -134,17 +145,18 @@ static void wifi_app_default_wifi_init(void){
 	esp_netif_sta = esp_netif_create_default_wifi_sta();
 	esp_netif_ap = esp_netif_create_default_wifi_ap();
 
-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+	pthread_mutex_lock(&mutex_WIFI);
+		ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE));
+	pthread_mutex_unlock(&mutex_WIFI);
 }
 
 static void wifi_app_sta_config(void){
-	wifi_config_t sta_config = {
-		.sta = {
-			.ssid = WIFI_STA_SSID,
-			//.ssid_len = strlen(WIFI_AP_SSID),
-			.password = WIFI_STA_PASSWORD,
-		},
-	};
+	wifi_config_t sta_config = { .sta = { .bssid_set = false}};
+
+	pthread_mutex_lock(&mutex_WIFI);
+	memcpy(sta_config.sta.ssid, nvs_WIFI_STA_SSID , 32);
+	memcpy(sta_config.sta.password, nvs_WIFI_STA_PASSWORD , 64);
+    pthread_mutex_unlock(&mutex_WIFI);
 
 	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA,&sta_config));
 }
@@ -152,14 +164,10 @@ static void wifi_app_sta_config(void){
 static void wifi_app_soft_ap_config(void){
 	uint8_t mac[6];
 	char WIFI_AP_SSID[32];
-	char dis_log[LOG_MSG_LEN];
 	int i;
 
     wifi_config_t ap_config = {
 		.ap = {
-	/*		.ssid = "TEST",
-			.ssid_len = strlen(WIFI_AP_SSID), */
-			.password = WIFI_AP_PASSWORD,
 			.channel = WIFI_AP_CHANNEL,
 			.ssid_hidden = WIFI_AP_SSID_HIDDEN,
 			.authmode = WIFI_AUTH_WPA2_PSK,
@@ -174,14 +182,17 @@ static void wifi_app_soft_ap_config(void){
     for(i = 0; i < 32;i++){
     	if (i <= strlen(WIFI_AP_SSID)){
     		ap_config.ap.ssid[i] = WIFI_AP_SSID[i];
-    	}
+    	}else ap_config.ap.ssid[i] = 0;
     }
     ap_config.ap.ssid_len = strlen(WIFI_AP_SSID);
 
-    ESP_LOGI(TAG,"WIFI_AP_SSID: %s",WIFI_AP_SSID);
-    sprintf(dis_log, "WIFI_AP_SSID: %s \n",WIFI_AP_SSID);
-    log_add(dis_log);
+    for(i = 0; i < 64;i++){
+    	if (i <= strlen(WIFI_AP_PASSWORD)){
+    		ap_config.ap.password[i] = WIFI_AP_PASSWORD[i];
+    	}else ap_config.ap.password[i] = 0;
+    }
 
+    ESP_LOGI(TAG,"WIFI_AP_SSID: %s, WIFI_AP_PASSWORD: %s",WIFI_AP_SSID, WIFI_AP_PASSWORD);
 
 
 	esp_netif_ip_info_t ap_ip_info;
@@ -202,6 +213,14 @@ static void wifi_app_soft_ap_config(void){
 
 static void wifi_app_task (void *pvParameters){
 	wifi_app_queue_msg_t msg;
+	wifi_mode_t mode;
+	size_t size;
+
+	nvs_app_get_string_value(nvs_WIFI_STA_SSID_key,NULL,&size);
+	if(size <= 32) nvs_app_get_string_value(nvs_WIFI_STA_SSID_key,nvs_WIFI_STA_SSID,&size);
+
+	nvs_app_get_string_value(nvs_WIFI_STA_PASSWORD_key,NULL,&size);
+	if(size <= 64) nvs_app_get_string_value(nvs_WIFI_STA_PASSWORD_key,nvs_WIFI_STA_PASSWORD,&size);
 
 	wifi_app_event_handler_init();
 	wifi_app_default_wifi_init();
@@ -230,20 +249,47 @@ static void wifi_app_task (void *pvParameters){
 					ESP_LOGI(TAG, "WIFI_APP_MSG_STA_CONNECTED_GOT_IP");
 					break;
 
+				case WIFI_APP_MSG_CONNECT:
+					ESP_LOGI(TAG, "WIFI_APP_MSG_CONNECT");
+					vTaskDelay(500);
+					ESP_ERROR_CHECK(esp_wifi_connect());
+					break;
+
+				case WIFI_APP_MSG_DISCONNECT:
+					ESP_LOGI(TAG, "WIFI_APP_MSG_DISCONNECT");
+					ESP_ERROR_CHECK(esp_wifi_disconnect());
+					break;
+
+				case WIFI_APP_MSG_STOP:
+					ESP_LOGI(TAG, "WIFI_APP_MSG_STOP");
+					vTaskDelay(1000);
+					ESP_ERROR_CHECK(esp_wifi_stop());
+					break;
+
 				case WIFI_APP_MSG_RESTART:
 					ESP_LOGI(TAG, "WIFI_APP_MSG_RESTART");
+
+					http_server_stop();
 
 					ESP_ERROR_CHECK(esp_wifi_deinit());
 					esp_netif_destroy(esp_netif_sta);
 					esp_netif_destroy(esp_netif_ap);
 
 					wifi_app_default_wifi_init();
-					wifi_app_sta_config();
-					wifi_app_soft_ap_config();
 
-					s_retry_num = 0;
+					pthread_mutex_lock(&mutex_WIFI);
+						s_retry_num = 0;
+						mode = WIFI_MODE;
+					pthread_mutex_unlock(&mutex_WIFI);
+
+					if (mode == WIFI_MODE_APSTA || mode == WIFI_MODE_STA) wifi_app_sta_config();
+					if (mode == WIFI_MODE_APSTA || mode == WIFI_MODE_AP) wifi_app_soft_ap_config();
+
+ESP_LOGE(TAG,"WIFI_APP_MSG_RESTART: STARTING WIFI!");
 
 					ESP_ERROR_CHECK(esp_wifi_start());
+
+					http_server_start();
 
 					break;
 
@@ -262,7 +308,7 @@ BaseType_t wifi_app_send_message(wifi_app_msg_e msgID){
 	return xQueueSend(wifi_app_queue_handle, &msg, portMAX_DELAY);
 }
 
-short int is_wifi_connected(){
+static short int is_wifi_connected(){
 	short int result ;
 
 pthread_mutex_lock(&mutex_WIFI);
@@ -287,11 +333,11 @@ void wifi_app_start(void){
 	}
 
 	xTaskCreatePinnedToCore(&wifi_app_task, "wifi_app_task", WIFI_APP_TASK_STACK_SIZE, NULL, WIFI_APP_TASK_PRIORITY, NULL, WIFI_APP_TASK_CORE_ID);
-
+/*
 	while(is_wifi_connected() != 1){
 		vTaskDelay(10);
 	}
-
+*/
 }
 
 void wifi_app_getIP(char *ip){
@@ -307,10 +353,31 @@ void wifi_app_getIP(char *ip){
 }
 
 void wifi_app_get_conf(char *ssid, char *pass , short int *status){
-	strcpy(ssid,WIFI_STA_SSID);
-	strcpy(pass,WIFI_STA_PASSWORD);
+	pthread_mutex_lock(&mutex_WIFI);
+		strcpy(ssid,nvs_WIFI_STA_SSID);
+		strcpy(pass,nvs_WIFI_STA_PASSWORD);
 
-	*status = is_wifi_connected();
+		*status = WIFI_CONNECTED;
+	pthread_mutex_unlock(&mutex_WIFI);
+}
+
+void wifi_app_set_conf(const char *ssid, const char *pass){
+	pthread_mutex_lock(&mutex_WIFI);
+		if(strcmp(nvs_WIFI_STA_SSID,ssid) != 0){
+			strcpy(nvs_WIFI_STA_SSID,ssid);
+			nvs_app_set_string_value(nvs_WIFI_STA_SSID_key,nvs_WIFI_STA_SSID);
+		}
+
+		if(strcmp(nvs_WIFI_STA_PASSWORD,pass) != 0){
+			strcpy(nvs_WIFI_STA_PASSWORD,pass);
+			nvs_app_set_string_value(nvs_WIFI_STA_PASSWORD_key,nvs_WIFI_STA_PASSWORD);
+		}
+
+		WIFI_MODE = WIFI_MODE_STA;
+
+		s_retry_num = WIFI_MAX_CONN_RETRIES + 1; // FORCING TO STOP -> RESTART WITHOUT CHANGE MODE
+	pthread_mutex_unlock(&mutex_WIFI);
+	wifi_app_send_message(WIFI_APP_MSG_STOP); // ESTO NO FUNCIONA SI ESTÁ EN MODO AP!!!
 }
 
 

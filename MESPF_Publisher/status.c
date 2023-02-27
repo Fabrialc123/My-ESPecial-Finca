@@ -15,6 +15,7 @@
 #include <string.h>
 #include <esp_sntp.h>
 #include <recollecter.h>
+#include <nvs_app.h>
 
 
 static const char TAG2[] = "STATUS";
@@ -22,7 +23,12 @@ static const char TAG2[] = "STATUS";
 time_t start;
 double upTimeAGG = 0;
 
-static char NTP_SERVER[64];
+#define nvs_NTP_SERVER_key	"ntp_sv"
+static char nvs_NTP_SERVER[32] = "";
+
+#define nvs_NTP_SYNC_key	"ntp_syn"
+static uint32_t nvs_NTP_SYNC = 3600;
+
 static short int NTP_STATUS = -1;
 
 static pthread_mutex_t mutex_STATUS;
@@ -37,56 +43,68 @@ void time_sync_notification_cb(struct timeval *tv)
 
 static void initialize_sntp(void)
 {
+	size_t size;
+
     ESP_LOGI(TAG2, "Initializing SNTP");
+
+    nvs_app_get_string_value(nvs_NTP_SERVER_key,NULL,&size);
+    if (size <= 32) nvs_app_get_string_value(nvs_NTP_SERVER_key,nvs_NTP_SERVER,&size);
+
+    nvs_app_get_uint32_value(nvs_NTP_SYNC_key, &nvs_NTP_SYNC);
+
+    ESP_LOGE(TAG2,"NTP_SERVER: %s , NTP_SYNC: %d",nvs_NTP_SERVER, nvs_NTP_SYNC);
+
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    //sntp_setservername(0, "192.168.3.51");
-    sntp_setservername(0, NTP_SERVERNAME);
+    sntp_setservername(0, nvs_NTP_SERVER);
     //sntp_setservername(0, "pool.ntp.org");
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
-    //sntp_set_sync_interval(1*3600*1000);
-    sntp_set_sync_interval(NTP_SECSTOSYNC*1000);
+    sntp_set_sync_interval(nvs_NTP_SYNC*1000);
 
 
     sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     sntp_init();
-
+/*
     ESP_LOGI(TAG2, "Waiting response from NTP Server...");
     vTaskDelay(50);
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
         vTaskDelay(50);
     }
 
-	pthread_mutex_lock(&mutex_STATUS);
-		strcpy(NTP_SERVER,NTP_SERVERNAME);
-	pthread_mutex_unlock(&mutex_STATUS);
     ESP_LOGI(TAG2, "Received response from NTP Server!");
-
+*/
 }
 
 void status_ntp_get_conf(char *server, unsigned int *sync_interval, short int *status){
-	strcpy(server,sntp_getservername(0));
-	*sync_interval = sntp_get_sync_interval();
-
 	pthread_mutex_lock(&mutex_STATUS);
-		*status = NTP_STATUS;
-	pthread_mutex_unlock(&mutex_STATUS);
 
+		strcpy(server,sntp_getservername(0));
+		*sync_interval = sntp_get_sync_interval();
+		*status = NTP_STATUS;
+
+	pthread_mutex_unlock(&mutex_STATUS);
 }
 
 void status_ntp_set_conf(const char *server, const unsigned int sync_interval){
-	sntp_stop();
-
 	pthread_mutex_lock(&mutex_STATUS);
-		strcpy(NTP_SERVER,server);
+		sntp_stop();
+
 		NTP_STATUS = 0;
+		if (strcmp(nvs_NTP_SERVER,server) != 0) {
+			ESP_LOGE(TAG2,"status_ntp_set_conf: CHANGING NTP_SERVER");
+			strcpy(nvs_NTP_SERVER,server);
+			nvs_app_set_string_value(nvs_NTP_SERVER_key, nvs_NTP_SERVER);
+			sntp_setservername(0, nvs_NTP_SERVER); // *server will be deleted after the statement!
+		}
+
+		if(nvs_NTP_SYNC != sync_interval){
+			ESP_LOGE(TAG2,"status_ntp_set_conf: CHANGING NTP_SYNC");
+			nvs_NTP_SYNC = sync_interval;
+			nvs_app_set_uint32_value(nvs_NTP_SYNC_key, nvs_NTP_SYNC);
+			sntp_set_sync_interval(nvs_NTP_SYNC * 1000);
+		}
+
+		sntp_init();
 	pthread_mutex_unlock(&mutex_STATUS);
-
-	sntp_setservername(0, NTP_SERVER); // *server will be deleted after the statement!
-
-	if (sync_interval < 15) sntp_set_sync_interval(15000); // Min is 15 secs
-	else sntp_set_sync_interval(sync_interval * 1000);
-
-	sntp_init();
 }
 
 void status_start(){
