@@ -63,7 +63,7 @@ static void initialize_sntp(void)
 
     sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     sntp_init();
-/*
+
     ESP_LOGI(TAG2, "Waiting response from NTP Server...");
     vTaskDelay(50);
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) {
@@ -71,7 +71,7 @@ static void initialize_sntp(void)
     }
 
     ESP_LOGI(TAG2, "Received response from NTP Server!");
-*/
+
 }
 
 void status_ntp_get_conf(char *server, unsigned int *sync_interval, short int *status){
