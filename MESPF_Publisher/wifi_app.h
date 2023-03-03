@@ -10,17 +10,9 @@
 
 #include "esp_netif.h"
 
-#define WIFI_STA_SSID				"MESPF"
-#define WIFI_STA_PASSWORD			"MESPF123"
-//#define WIFI_STA_SSID				"Red Alcaraz"
-//#define WIFI_STA_PASSWORD			"SanLorenzo2019"
 
-#define WIFI_MAX_CONN_RETRIES		10
+#define WIFI_MAX_CONN_RETRIES		30
 
-#define WIFI_MODE					WIFI_MODE_APSTA
-
-//#define WIFI_AP_SSID				"ESP32_TEST"
-#define WIFI_AP_PASSWORD			"MESPF123"
 #define WIFI_AP_CHANNEL				1				// For more details see the bandwidth of WiFi Channels and the ESP32 documentation
 #define	WIFI_AP_SSID_HIDDEN			0
 #define WIFI_AP_MAX_CONNECTIONS		5				// Max clients
@@ -45,6 +37,9 @@ typedef enum{
 	WIFI_APP_MSG_START_HTTP_SERVER = 0,
 	WIFI_APP_MSG_CONNECTING_FROM_HTTP_SERVER,
 	WIFI_APP_MSG_STA_CONNECTED_GOT_IP,
+	WIFI_APP_MSG_CONNECT,
+	WIFI_APP_MSG_DISCONNECT,
+	WIFI_APP_MSG_STOP,
 	WIFI_APP_MSG_RESTART
 } wifi_app_msg_e;
 
@@ -72,5 +67,6 @@ void wifi_app_start(void);
 void wifi_app_getIP(char *ip);
 
 void wifi_app_get_conf(char *ssid, char *pass, short int *status);
+void wifi_app_set_conf(const char *ssid, const char *pass);
 
 #endif /* MAIN_WIFI_APP_H_ */
