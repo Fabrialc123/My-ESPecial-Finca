@@ -21,7 +21,10 @@
 #define MAX_TICKS_TO_WAIT		1000		// 1000 ms -> 1 s
 #define MAX_CHARAC_ROW			40			// Only 16 are visible at once (per row)
 
+#define LCD_TIME_WHEN_NOTHING	100 * 3
 #define LCD_TIME_TO_SHOW_NEXT	100 * 3		// 1 second = 100 ticks
+#define LCD_TIME_BEFORE_UNITS	100 * 2
+#define LCD_TIME_BEFORE_VALUES	100 * 1
 #define LCD_TIME_BEFORE_MOVE	100 * 3
 #define LCD_TIME_MOVE_FREC		100 / 2
 #define LCD_TIME_WHEN_FAIL		100
