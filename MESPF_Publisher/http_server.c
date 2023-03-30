@@ -325,6 +325,27 @@ static esp_err_t setMQTTConfiguration_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
+static esp_err_t setWIFIConfiguration_handler(httpd_req_t *req){
+	char buf[128], *ssid,*pass, response[30];
+	int recv_len;
+	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
+
+	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
+	else {
+		ssid = strtok(buf,"\n");
+		pass = strtok(NULL,"\n");
+
+		wifi_app_set_conf(ssid,pass);
+ESP_LOGE(TAG,"setWIFIConfiguration_handler: wifi_app_set_conf OK!");
+		sprintf(response,"Restarted WIFI Service");
+	}
+
+	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+	httpd_resp_send(req, response, strlen(response));
+
+	return ESP_OK;
+}
+
 static esp_err_t SensorsConfiguration_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsConfiguration requested");
@@ -789,6 +810,14 @@ static httpd_handle_t http_server_configure(void){
 	        .user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &setMQTTConfiguration));
+		
+	    httpd_uri_t setWIFIConfiguration = {
+	        .uri = "/setWIFIConfiguration",
+	        .method = HTTP_POST,
+	        .handler = setWIFIConfiguration_handler,
+	        .user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &setWIFIConfiguration));
 
 	    httpd_uri_t SensorsConfiguration = {
 			.uri = "/SensorsConfiguration",
