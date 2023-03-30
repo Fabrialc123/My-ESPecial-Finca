@@ -11,42 +11,119 @@
 	</head>
 	<body>
 	<header>
-		<h1>ESP32 Application Development</h1>
+		<h1>ESP32 configuration page</h1>
+		<div class="row" id="navigation_tabs">
+			<div class="col-3">
+				<input id="status_button" type="button" value="Status" onclick="changeTab(0);" disabled="disabled">
+			</div>
+			<div class="col-3">
+				<input id="configurations_button" type="button" value="Configurations" onclick="changeTab(1);">
+			</div>
+			<div class="col-3">
+				<input id="sensors_button" type="button" value="Sensors" onclick="changeTab(2);">
+			</div>
+			<div class="col-3">
+				<input id="ota_button" type="button" value="OTA" onclick="changeTab(3);">
+			</div>
+		</div>
 	</header>
-	
-	<div id="WIFI_CONF">
-	<h2 id="configuration">WIFI Configuration</h2> <span class="dot" id="WIFI_STATUS"></span> <br>
-		<label>SSID: <input type="text" id="WIFI_SSID" name="WIFI_SSID" maxlength="32" disabled/></label>
-		<label>Password: <input type="text" id="WIFI_PASS" name="WIFI_PASS" maxlength="64" disabled/></label>
-		<input type="button" value="Submit" id="WIFI_SUBMIT" onclick="submitWifiConf();" hidden> 
-		<input type="button" value="Edit" id="WIFI_EDIT" onclick="editWifiConf();">
+
+	<div id="ESP_STATUS" class="information_box" style="display: block;">
+		<h2 id="esp_ip">IP: <span id="sensor_0_unit_0_value_0_span"></span></h2>
+		<hr>
+		<h2 id="esp_id">ID: <span id="sensor_0_unit_0_value_1_span"></span></h2>
+		<hr>
+		<h2 id="esp_date">Date: <span id="sensor_0_unit_0_value_2_span"></span></h2>
+		<hr>
+		<h2 id="esp_uptime">Uptime: <span id="sensor_0_unit_0_value_3_span"></span></h2>
 	</div>
-	<hr>
 	
-	<div id="NTP_CONF">
-	<h2 id="configuration">NTP Configuration</h2> <span class="dot" id="NTP_STATUS"></span> <br>
-		<label>NTP Server: <input type="text" id="NTP_SERVER" name="NTP_SERVER" maxlength="32" disabled/></label>
-		<label>Sync time (secs): <input type="number" id="NTP_SYNC" name="NTP_SYNC" min="15" max="99999" disabled/></label>
-		<input type="button" value="Submit" id="NTP_SUBMIT" onclick="submitNTPConf();" hidden> 
-		<input type="button" value="Edit" id="NTP_EDIT" onclick="editNTPConf();">
+	<div id="CONFIGURATIONS" class="information_box" style="display: none;">
+		<div id="WIFI_CONF">
+			<h2 class="configuration">WIFI Configuration</h2> <span class="dot" id="WIFI_STATUS"></span> <br>
+
+			<div class="row">
+				<div class="col-2">
+					<label>SSID: <input type="text" id="WIFI_SSID" name="WIFI_SSID" maxlength="32" disabled/></label>
+				</div>
+				<div class="col-2">
+					<label>Password: <input type="text" id="WIFI_PASS" name="WIFI_PASS" maxlength="64" disabled/></label>
+				</div>
+				<div class="col-7">
+				</div>
+				<div class="col-1">
+					<input type="button" value="Submit" id="WIFI_SUBMIT" onclick="submitWifiConf();" hidden> 
+					<input type="button" value="Edit" id="WIFI_EDIT" onclick="editWifiConf();">
+				</div>
+			</div>
+		</div>
+		<hr>
+		
+		<div id="NTP_CONF">
+			<h2 class="configuration">NTP Configuration</h2> <span class="dot" id="NTP_STATUS"></span> <br>
+
+			<div class="row">
+				<div class="col-2">
+					<label>NTP Server: <input type="text" id="NTP_SERVER" name="NTP_SERVER" maxlength="32" disabled/></label>
+				</div>
+				<div class="col-2">
+					<label>Sync time (secs): <input type="number" id="NTP_SYNC" name="NTP_SYNC" min="15" max="99999" disabled/></label>
+				</div>
+				<div class="col-7">
+				</div>
+				<div class="col-1">
+					<input type="button" value="Submit" id="NTP_SUBMIT" onclick="submitNTPConf();" hidden> 
+					<input type="button" value="Edit" id="NTP_EDIT" onclick="editNTPConf();">
+				</div>
+			</div>
+		</div>
+		<hr>	
+		
+		<div id="MQTT_CONF">
+			<h2 class="configuration">MQTT Configuration</h2> <span class="dot" id="MQTT_STATUS"></span> <br>
+			
+			<div class="row">
+				<div class="col-2">
+					<label>Broker IP: <input type="text" id="MQTT_IP" name="MQTT_IP" maxlength="32" disabled/></label>
+				</div>
+				<div class="col-2">
+					<label>Broker Port: <input type="number" id="MQTT_PORT" name="MQTT_PORT" min="0" max="99999" disabled/></label>
+				</div>
+				<div class="col-2">
+					<label>Username: <input type="text" id="MQTT_USER" name="MQTT_USER" maxlength="32" disabled/></label>
+				</div>
+				<div class="col-2">
+					<label>Password: <input type="text" id="MQTT_PASS" name="MQTT_PASS" maxlength="64" disabled/></label>	
+				</div>
+				<div class="col-3">
+				</div>
+				<div class="col-1">
+					<input type="button" value="Submit" id="MQTT_SUBMIT" onclick="submitMQTTConf();" hidden> 
+					<input type="button" value="Edit" id="MQTT_EDIT" onclick="editMQTTConf();">	
+				</div>
+			</div>
+		</div>
 	</div>
-	<hr>	
 	
-	<div id="MQTT_CONF">
-	<h2 id="configuration">MQTT Configuration</h2> <span class="dot" id="MQTT_STATUS"></span> <br>
-		<label>Broker IP: <input type="text" id="MQTT_IP" name="MQTT_IP" maxlength="32" disabled/></label>
-		<label>Broker Port: <input type="number" id="MQTT_PORT" name="MQTT_PORT" min="0" max="99999" disabled/></label>
-		<label>Username: <input type="text" id="MQTT_USER" name="MQTT_USER" maxlength="32" disabled/></label>
-		<label>Password: <input type="text" id="MQTT_PASS" name="MQTT_PASS" maxlength="64" disabled/></label>
-		<input type="button" value="Submit" id="MQTT_SUBMIT" onclick="submitMQTTConf();" hidden> 
-		<input type="button" value="Edit" id="MQTT_EDIT" onclick="editMQTTConf();">		
+	<div id="SENSORS" class="information_box" style="display: none;">
+		<div id="sensor_deployment">
+			<div id="sensor_deployment_header">
+				<h3>Add sensor:</h3>
+				<div class="buttons">
+					<input type="button" value="Add MQ2" onclick="deploySensorForm(0)" />
+					<input type="button" value="Add DHT22" onclick="deploySensorForm(1)" />
+					<input type="button" value="Add HC-RS04" onclick="deploySensorForm(2)" />
+					<input type="button" value="Add SO-SEN" onclick="deploySensorForm(3)" />
+				</div>
+			</div>
+			<div id="sensor_deployment_body">
+			</div>
+		</div>
+		<div id="sensor_data">
+		</div>
 	</div>
-	<hr>
 	
-	
-	
-	<div id="OTA">
-	<h2>ESP32 Firmware Update</h2>
+	<div id="OTA" class="information_box" style="display: none;">
 		<label id="latest_firmware_label">Latest Firmware: </label>
 		<div id="latest_firmware"></div> 
 		<input type="file" id="selected_file" accept=".bin" style="display: none;" onchange="getFileInfo()" />
@@ -57,7 +134,6 @@
 		<h4 id="file_info"></h4>	
 		<h4 id="ota_update_status"></h4>
 	</div>
-	<hr>
 		
 	</body>
 <html>
