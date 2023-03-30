@@ -4,7 +4,6 @@ idf_component_register(SRCS main.c wifi_app.c http_server.c
 							mqtt/mqtt_commands.c
 							recollecter.c
 							status.c
-							tests.c
 							gpios/led_rgb.c
 							gpios/lcd.c
 							gpios/mq2.c
@@ -14,6 +13,8 @@ idf_component_register(SRCS main.c wifi_app.c http_server.c
 							gpios/rtc.c
 							log.c
 							nvs_app.c
+							gpios_manager.c
+							sensors_manager.c
 						INCLUDE_DIRS "."
 						EMBED_FILES webpage/app.css 
 						webpage/app.js  
