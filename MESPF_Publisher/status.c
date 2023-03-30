@@ -126,7 +126,7 @@ void status_start(){
 	strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeInfo);
 	ESP_LOGI(TAG2, "The current date/time in Spain is: %s", strftime_buf);
 
-	register_recollecter(&status_recollecter);
+	register_recollecter(&status_recollecter, &status_gpios_recollecter, &status_parameters_recollecter);
 
 }
 
@@ -217,9 +217,8 @@ void status_getUpTime(char *utm){
     sprintf(utm, "%03d %02d:%02d", d, h, m);
 }
 
-
-sensor_data_t status_recollecter (void){
-	sensor_data_t aux;
+sensor_data_t* status_recollecter (int* number_of_sensors){
+	sensor_data_t* aux;
 	sensor_value_t *aux2;
 	int number_of_values;
 
@@ -237,39 +236,40 @@ sensor_data_t status_recollecter (void){
 	utm = (char*)malloc(sizeof(char)*15);
 	memset(utm,0,15);
 
-
 	wifi_app_getIP(myIP);
 	mqtt_app_getID(myID);
 	status_getDateTime(tm);
 	status_getUpTime(utm);
 
+	*number_of_sensors = 1;
 
 	number_of_values = 4;
+	aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * 1);
 	aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * number_of_values);
 
-	strcpy(aux.sensorName, "STATUS");
-	aux.valuesLen = number_of_values;
-	aux.sensor_values = aux2;
+	strcpy(aux[0].sensorName, "STATUS");
+	aux[0].valuesLen = number_of_values;
+	aux[0].sensor_values = aux2;
 
-	aux.sensor_values[0].showOnLCD = STATUS_SHOW_IP_ON_LCD;
-	aux.sensor_values[0].sensor_value_type = STRING;
-	strcpy(aux.sensor_values[0].valueName,"IP");
-	strcpy(aux.sensor_values[0].sensor_value.cval, myIP);
+	aux[0].sensor_values[0].showOnLCD = STATUS_SHOW_IP_ON_LCD;
+	aux[0].sensor_values[0].sensor_value_type = STRING;
+	strcpy(aux[0].sensor_values[0].valueName,"IP");
+	strcpy(aux[0].sensor_values[0].sensor_value.cval, myIP);
 
-	aux.sensor_values[1].showOnLCD = STATUS_SHOW_ID_ON_LCD;
-	aux.sensor_values[1].sensor_value_type = STRING;
-	strcpy(aux.sensor_values[1].valueName,"ID");
-	strcpy(aux.sensor_values[1].sensor_value.cval, myID);
+	aux[0].sensor_values[1].showOnLCD = STATUS_SHOW_ID_ON_LCD;
+	aux[0].sensor_values[1].sensor_value_type = STRING;
+	strcpy(aux[0].sensor_values[1].valueName,"ID");
+	strcpy(aux[0].sensor_values[1].sensor_value.cval, myID);
 
-	aux.sensor_values[2].showOnLCD = STATUS_SHOW_DATE_ON_LCD;
-	aux.sensor_values[2].sensor_value_type = STRING;
-	strcpy(aux.sensor_values[2].valueName,"TM");
-	strcpy(aux.sensor_values[2].sensor_value.cval, tm);
+	aux[0].sensor_values[2].showOnLCD = STATUS_SHOW_DATE_ON_LCD;
+	aux[0].sensor_values[2].sensor_value_type = STRING;
+	strcpy(aux[0].sensor_values[2].valueName,"TM");
+	strcpy(aux[0].sensor_values[2].sensor_value.cval, tm);
 
-	aux.sensor_values[3].showOnLCD = STATUS_SHOW_UPTIME_ON_LCD;
-	aux.sensor_values[3].sensor_value_type = STRING;
-	strcpy(aux.sensor_values[3].valueName,"UT");
-	strcpy(aux.sensor_values[3].sensor_value.cval, utm);
+	aux[0].sensor_values[3].showOnLCD = STATUS_SHOW_UPTIME_ON_LCD;
+	aux[0].sensor_values[3].sensor_value_type = STRING;
+	strcpy(aux[0].sensor_values[3].valueName,"UT");
+	strcpy(aux[0].sensor_values[3].sensor_value.cval, utm);
 
 	free(myIP);
 	free(myID);
@@ -278,4 +278,12 @@ sensor_data_t status_recollecter (void){
 
 
 	return aux;
+}
+
+sensor_gpios_info_t* status_gpios_recollecter (int* number_of_sensors){
+	return NULL;
+}
+
+sensor_additional_parameters_info_t* status_parameters_recollecter (int* number_of_sensors){
+	return NULL;
 }
