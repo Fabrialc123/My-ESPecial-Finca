@@ -26,11 +26,15 @@ union sensor_value_u{
 	char cval[CHAR_LENGTH];
 } ;
 
+// --------------------------------------------------- Values -----------------------------------------------------------------
+
 typedef struct {
 	bool showOnLCD;
 	char valueName[CHAR_LENGTH];
 	sensor_value_type_e sensor_value_type;
 	union sensor_value_u sensor_value;
+	bool alert;
+	int ticks_to_alert;
 	union sensor_value_u upper_threshold;
 	union sensor_value_u lower_threshold;
 }sensor_value_t;
@@ -41,18 +45,53 @@ typedef struct {
 	sensor_value_t *sensor_values;
 }sensor_data_t;
 
+// ---------------------------------------------------- GPIOS -----------------------------------------------------------------
 
-typedef sensor_data_t (*recollecter_function)(void);
+typedef struct{
+	char gpioName[CHAR_LENGTH];
+	int sensor_gpio;
+}sensor_gpio_t;
 
-int register_recollecter (recollecter_function rtr);
+typedef struct{
+	int gpiosLen;
+	sensor_gpio_t *sensor_gpios;
+}sensor_gpios_info_t;
+
+// ------------------------------------------- Additional parameters ----------------------------------------------------------
+
+typedef struct{
+	char parameterName[CHAR_LENGTH];
+	sensor_value_type_e sensor_parameter_type;
+	union sensor_value_u sensor_parameter;
+}sensor_additional_parameter_t;
+
+typedef struct{
+	int parametersLen;
+	sensor_additional_parameter_t *sensor_parameters;
+}sensor_additional_parameters_info_t;
+
+typedef sensor_data_t* (*recollecter_function)(int*);
+typedef sensor_gpios_info_t* (*recollecter_gpios_function)(int*);
+typedef sensor_additional_parameters_info_t* (*recollecter_parameters_function)(int*);
+
+int register_recollecter (recollecter_function rtr, recollecter_gpios_function rtg, recollecter_parameters_function rtp);
+int delete_recollecter (int id);
 
 int get_recollecters_size (void);
 
-int get_sensor_data_json (int sensor_id, char *data, char *sensorName);
+void get_sensors_json(char *data);
+void get_sensors_values_json(char *data);
+void get_sensors_gpios_json(char *data);
+void get_sensors_parameters_json(char *data);
+void get_sensors_alerts_json(char *data);
+
+int get_sensor_data_json (int sensor_id, int pos, char *data, char *sensorName);
 
 //void get_sensor_data_name(int sensor_id, char *name);
 
-sensor_data_t get_sensor_data (int sensor_id);
+sensor_data_t* get_sensor_data (int sensor_id, int* number_of_sensors);
+sensor_gpios_info_t* get_sensor_gpios (int sensor_id, int* number_of_sensors);
+sensor_additional_parameters_info_t* get_sensor_parameters (int sensor_id, int* number_of_sensors);
 
 void recollecter_start(void);
 
