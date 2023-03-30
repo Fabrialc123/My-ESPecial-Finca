@@ -11,37 +11,118 @@
 #include "driver/adc.h"
 #include "recollecter.h"
 
-#define SO_SEN_LOW_V	4095
+// ------------------------------------------------- Sensor information --------------------------------------------------------------
 
-#define SO_SEN_HIGH_V	1700
+#define SO_SEN_N_GPIOS							1
 
-#define N_SAMPLES   	64          						//Used for minimizing noise
+#define SO_SEN_N_VALUES							1
 
-static const adc1_channel_t channel_so_sen = ADC1_CHANNEL_7;     	//ADC1 channel 7 -> GPIO35
-static const adc_bits_width_t width_so_sen = ADC_WIDTH_BIT_12;
-static const adc_atten_t atten_so_sen = ADC_ATTEN_DB_11;
+#define SO_SEN_N_ADDITIONAL_PARAMS				0
 
-#define SO_SEN_TIME_TO_UPDATE_DATA	100 * 5 				// 1 second = 100 ticks
+#define SO_SEN_LOW_V							4095
+
+#define SO_SEN_HIGH_V							1700
+
+#define SO_SEN_TIME_TO_UPDATE_DATA				500	// 100 = 1 second
+
+// Structure for sensor GPIOS
+
+typedef struct {
+	int a0;
+} so_sen_gpios_t;
+
+// Structure for sensor data
+
+typedef struct {
+	float soil_moisture_percentage;
+} so_sen_data_t;
 
 // Value related to the LCD
 
 #define SO_SEN_SHOW_MOISTURE_PERCENTAGE_ON_LCD	true
 
-// Values related to the alerts
+// Lecture properties
 
-#define SO_SEN_ALERT_MOISTURE					true
-#define SO_SEN_MOISTURE_TICKS_TO_ALERT			3
-#define SO_SEN_MOISTURE_UPPER_THRESHOLD			70.0
-#define SO_SEN_MOISTURE_LOWER_THRESHOLD			0.0
+static const adc_bits_width_t so_sen_width 		= ADC_WIDTH_BIT_12;
+static const adc_atten_t so_sen_atten	 		= ADC_ATTEN_DB_11;
+
+#define SO_SEN_N_SAMPLES   						64	//Used for minimizing noise
+
+// --------------------------------------------------- Sensor management -----------------------------------------------------------
+
+/*
+ * Startup SO_SEN with the information previously saved (NVS)
+ */
+void so_sen_startup(void);
 
 /*
  * Initializes SO_SEN peripheral
  */
 void so_sen_init(void);
 
-/**
- * Gets data
+/*
+ * Disables SO_SEN peripheral
  */
-sensor_data_t so_sen_get_sensor_data(void);
+void so_sen_destroy(void);
+
+/**
+ * Add a new SO_SEN sensor
+ *
+ * NOTE: return 1 when it happens successfully, -1 in other cases
+ */
+int so_sen_add_sensor(int* gpios, union sensor_value_u* parameters);
+
+/**
+ * Delete a SO_SEN sensor
+ *
+ * Note: return 1 when it happens successfully, -1 in other cases
+ */
+int so_sen_delete_sensor(int pos);
+
+// ------------------------------------------------------- Sets --------------------------------------------------------------------
+
+/**
+ * Change GPIOS of a sensor
+ *
+ * Note: return 1 when it happens successfully, -1 in other cases
+ */
+int so_sen_set_gpios(int pos, int* gpios);
+
+/**
+ * Change parameters of a sensor
+ *
+ * Note: return 1 when it happens successfully, -1 in other cases
+ */
+int so_sen_set_parameters(int pos, union sensor_value_u* parameters);
+
+/**
+ * Change the alert values
+ *
+ * Note: return 1 when it happens successfully, -1 in other cases
+ */
+int so_sen_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold);
+
+// ------------------------------------------------------- Gets --------------------------------------------------------------------
+
+/**
+ * Gets data of all sensors of this type
+ *
+ * Note: in case of error, return NULL pointer
+ */
+sensor_data_t* so_sen_get_sensors_data(int* number_of_sensors);
+
+/**
+ * Gets GPIOS of all sensors of this type
+ *
+ * Note: in case of error, return NULL pointer
+ */
+sensor_gpios_info_t* so_sen_get_sensors_gpios(int* number_of_sensors);
+
+/**
+ * Gets additional parameters of all sensors of this type
+ *
+ * Note: in case of error (or it is a sensor with no additional parameters), return NULL pointer
+ */
+sensor_additional_parameters_info_t* so_sen_get_sensors_additional_parameters(int* number_of_sensors);
 
 #endif /* MAIN_GPIOS_SO_SEN_H_ */
