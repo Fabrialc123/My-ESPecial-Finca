@@ -10,130 +10,179 @@
 
 #include <stdbool.h>
 #include <pthread.h>
+#include <sys/time.h>
+#include <esp_timer.h>
+#include <nvs_app.h>
 
 #include "unistd.h"
 #include "esp_log.h"
 #include "string.h"
-#include "soc/rtc.h"
-#include "driver/mcpwm.h"
 #include "driver/gpio.h"
 #include "mqtt/mqtt_commands.h"
+#include "gpios_manager.h"
+#include "sensors_manager.h"
 
-static const char TAG[]  = "hc_rs04";
+// Values related to the HC_RS04 sensor in general
 
-bool g_hc_rs04_initialized = false;
+static TaskHandle_t task_hc_rs04 					= NULL;
 
-static float water_level_percentage;
+static const char TAG[]  							= "hc_rs04";
+
+bool g_hc_rs04_initialized 							= false;
 
 static pthread_mutex_t mutex_hc_rs04;
 
-static xQueueHandle cap_queue;
+// Arrays for the HC_RS04 sensors management
+
+static hc_rs04_additional_params_t* hc_rs04_additional_params_array;
+static hc_rs04_gpios_t* hc_rs04_gpios_array;
+static hc_rs04_data_t* hc_rs04_data_array;
+
+static int hc_rs04_cont								= 0;
+
+// Values related to the alerts
+
+static bool hc_rs04_alert_water_level				= false;
+static int hc_rs04_water_level_ticks_to_alert		= 5;
+static float hc_rs04_water_level_upper_threshold	= 1000.0;
+static float hc_rs04_water_level_lower_threshold	= -1000.0;
+
+static int* water_level_alert_counter;
+static bool* water_level_is_alerted;
+
+// NVS keys
+
+#define nvs_HC_RS04_CONT_key		"hc_rs04_cont"
+#define nvs_HC_RS04_GPIOS_key		"hc_rs04_gpios"
+#define nvs_HC_RS04_PARAMETERS_key	"hc_rs04_param"
+
 
 /**
- * This is an ISR callback, we take action according to the captured edge
+ * Shift and delete
  */
+static void shift_delete(int pos){
 
-static bool hc_rs04_echo_isr_handler(mcpwm_unit_t mcpwm, mcpwm_capture_channel_id_t cap_sig, const cap_event_data_t *edata, void *arg) {
-	static uint32_t cap_val_begin_of_sample = 0;
-	static uint32_t cap_val_end_of_sample = 0;
+	for(int i = pos; i < hc_rs04_cont - 1; i++){
 
-    //calculate the interval in the ISR,
-    //so that the interval will be always correct even when cap_queue is not handled in time and overflow.
-    BaseType_t high_task_wakeup = pdFALSE;
+		hc_rs04_additional_params_array[pos].distance_between_sensor_and_tank = hc_rs04_additional_params_array[pos + 1].distance_between_sensor_and_tank;
+		hc_rs04_additional_params_array[pos].tank_length = hc_rs04_additional_params_array[pos + 1].tank_length;
 
-    if(edata->cap_edge == MCPWM_POS_EDGE){
-        // store the timestamp when pos edge is detected
-        cap_val_begin_of_sample = edata->cap_value;
-        cap_val_end_of_sample = cap_val_begin_of_sample;
-    }
-    else{
-        cap_val_end_of_sample = edata->cap_value;
+		hc_rs04_gpios_array[pos].echo = hc_rs04_gpios_array[pos + 1].echo;
+		hc_rs04_gpios_array[pos].trig = hc_rs04_gpios_array[pos + 1].trig;
 
-        uint32_t pulse_count = cap_val_end_of_sample - cap_val_begin_of_sample;
+		hc_rs04_data_array[pos].water_level_percentage = hc_rs04_data_array[pos + 1].water_level_percentage;
 
-        // send measurement back though queue
-        xQueueSendFromISR(cap_queue, &pulse_count, &high_task_wakeup);
-    }
+		water_level_alert_counter[pos] = water_level_alert_counter[pos + 1];
+		water_level_is_alerted[pos] = water_level_is_alerted[pos + 1];
+	}
 
-    return high_task_wakeup == pdTRUE;
+	hc_rs04_cont--;
 }
 
 /**
  * Task for HC_RS04
  */
-
 static void hc_rs04_task(void *pvParameters){
 
-	uint32_t pulse_count;
-	uint32_t pulse_width_us;
-	float distance;
-
-	// Variables related to the alerts
+	int64_t start, echo_start, time, timeout;
+	bool fail;
+	float distance, aux;
 
 	int msg_id = 0;
 
-	int water_level_percentage_alert_counter = 0;
-
-	bool water_level_percentage_is_alerted = false;
-
 	for(;;){
-
-		// Pull up trig pin for 10 us
-		gpio_set_level(HC_RS04_TRIG_GPIO, 1);
-		usleep(10);
-
-		// Pull it down now
-		gpio_set_level(HC_RS04_TRIG_GPIO, 0);
-
-		xQueueReceive(cap_queue, &pulse_count, portMAX_DELAY);
 
 		pthread_mutex_lock(&mutex_hc_rs04);
 
-		pulse_width_us = pulse_count * (1000000.0 / rtc_clk_apb_freq_get());
+		for(int i = 0; i < hc_rs04_cont; i++){
 
-        if (pulse_width_us > 35000) {
-        	ESP_LOGE(TAG,"Error, distance cannot be measured ");
-        }
-        else{
-        	distance = (float) pulse_width_us / 59;
+		    // Pull down trig pin for 4 us
+		    gpio_set_level(hc_rs04_gpios_array[i].trig, 0);
+		    usleep(4);
 
-        	water_level_percentage = 100 - (((distance - DISTANCE_BETWEEN_SENSOR_AND_TANK) / TANK_LENGTH) * 100);
-        }
+		    // Pull up trig pin for 10 us
+		    gpio_set_level(hc_rs04_gpios_array[i].trig, 1);
+		    usleep(10);
 
-		// Water level alert
-		if(HC_RS04_ALERT_WATER_LEVEL){
+		    // Pull it down now
+		    gpio_set_level(hc_rs04_gpios_array[i].trig, 0);
 
-			// Update counter
-			if((water_level_percentage < HC_RS04_WATER_LEVEL_LOWER_THRESHOLD) && (water_level_percentage_alert_counter > -HC_RS04_WATER_LEVEL_TICKS_TO_ALERT))
-				water_level_percentage_alert_counter--;
-			else if((water_level_percentage > HC_RS04_WATER_LEVEL_UPPER_THRESHOLD) && (water_level_percentage_alert_counter < HC_RS04_WATER_LEVEL_TICKS_TO_ALERT))
-				water_level_percentage_alert_counter++;
-			else{
-				if(water_level_percentage_alert_counter > 0)
-					water_level_percentage_alert_counter--;
-				else if(water_level_percentage_alert_counter < 0)
-					water_level_percentage_alert_counter++;
-			}
+		    // Wait for echo
+		    fail = false;
+		    start = esp_timer_get_time();
+		    while(!gpio_get_level(hc_rs04_gpios_array[i].echo) && !fail)
+		        if(esp_timer_get_time() - start >= PING_TIMEOUT)
+		        	fail = true;
 
-			// Check if the value can be alerted again
-			if((water_level_percentage_alert_counter == 0) && water_level_percentage_is_alerted){
-				water_level_percentage_is_alerted = false;
-			}
+		    if(fail)
+		    	ESP_LOGE(TAG,"Error, echo HIGH signal not happened");
+		    else{
 
-			// Check if it is the moment to alert
-			if((water_level_percentage_alert_counter == -HC_RS04_WATER_LEVEL_TICKS_TO_ALERT) && !water_level_percentage_is_alerted){
+				// Measuring
+				fail = false;
+				echo_start = esp_timer_get_time();
+				time = echo_start;
+				timeout = MAX_SENSE_DISTANCE * ROUNDTRIP;
+				while (gpio_get_level(hc_rs04_gpios_array[i].echo) && !fail){
+					time = esp_timer_get_time();
+					if (esp_timer_get_time() - echo_start >= timeout)
+						fail = true;
+				}
 
-				mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on lower threshold (value: water_level_percentage)");
+				if(fail)
+					ESP_LOGE(TAG,"Error, distance cannot be measured");
+				else{
+					distance = (float) (time - echo_start) / ROUNDTRIP;
 
-				water_level_percentage_is_alerted = true;
-				msg_id++;
-			}
-			else if((water_level_percentage_alert_counter == HC_RS04_WATER_LEVEL_TICKS_TO_ALERT) && !water_level_percentage_is_alerted){
+					aux = 100 - (((distance - hc_rs04_additional_params_array[i].distance_between_sensor_and_tank) / hc_rs04_additional_params_array[i].tank_length) * 100);
 
-				mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on upper threshold (value: water_level_percentage)");
+					if(aux > 100.0){
+						hc_rs04_data_array[i].water_level_percentage = 100.0;
+					}
+					else if(aux < 0.0){
+						hc_rs04_data_array[i].water_level_percentage = 0.0;
+					}
+					else{
+						hc_rs04_data_array[i].water_level_percentage = aux;
+					}
+				}
+		    }
 
-				water_level_percentage_is_alerted = true;
-				msg_id++;
+			// Water level alert
+			if(hc_rs04_alert_water_level){
+
+				// Update counter
+				if((hc_rs04_data_array[i].water_level_percentage < hc_rs04_water_level_lower_threshold) && (water_level_alert_counter[i] > -hc_rs04_water_level_ticks_to_alert))
+					water_level_alert_counter[i]--;
+				else if((hc_rs04_data_array[i].water_level_percentage > hc_rs04_water_level_upper_threshold) && (water_level_alert_counter[i] < hc_rs04_water_level_ticks_to_alert))
+					water_level_alert_counter[i]++;
+				else{
+					if(water_level_alert_counter[i] > 0)
+						water_level_alert_counter[i]--;
+					else if(water_level_alert_counter[i] < 0)
+						water_level_alert_counter[i]++;
+				}
+
+				// Check if the value can be alerted again
+				if((water_level_alert_counter[i] == 0) && water_level_is_alerted[i]){
+					water_level_is_alerted[i] = false;
+				}
+
+				// Check if it is the moment to alert
+				if((water_level_alert_counter[i] == -hc_rs04_water_level_ticks_to_alert) && !water_level_is_alerted[i]){
+
+					mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on lower threshold (value: water_level_percentage)");
+
+					water_level_is_alerted[i] = true;
+					msg_id++;
+				}
+				else if((water_level_alert_counter[i] == hc_rs04_water_level_ticks_to_alert) && !water_level_is_alerted[i]){
+
+					mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on upper threshold (value: water_level_percentage)");
+
+					water_level_is_alerted[i] = true;
+					msg_id++;
+				}
 			}
 		}
 
@@ -143,92 +192,414 @@ static void hc_rs04_task(void *pvParameters){
 	}
 }
 
+void hc_rs04_startup(void){
+	size_t size = 0;
+	uint8_t aux = 0;
+
+	nvs_app_get_uint8_value(nvs_HC_RS04_CONT_key,&aux);
+
+	hc_rs04_cont = aux;
+
+	hc_rs04_additional_params_array = (hc_rs04_additional_params_t*) malloc(sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
+	hc_rs04_gpios_array = (hc_rs04_gpios_t*) malloc(sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
+	hc_rs04_data_array = (hc_rs04_data_t*) malloc(sizeof(hc_rs04_data_t) * hc_rs04_cont);
+
+	water_level_alert_counter = (int*) malloc(sizeof(int) * hc_rs04_cont);
+	water_level_is_alerted = (bool*) malloc(sizeof(bool) * hc_rs04_cont);
+
+	if(hc_rs04_cont > 0){
+		nvs_app_get_blob_value(nvs_HC_RS04_GPIOS_key,NULL,&size);
+		if(size != 0)
+			nvs_app_get_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,&size);
+
+		int gpios[HC_RS04_N_GPIOS];
+		for(int i = 0; i < hc_rs04_cont; i++){
+			gpios[0] = hc_rs04_gpios_array[i].trig;
+			gpios[1] = hc_rs04_gpios_array[i].echo;
+			gpios_manager_lock(gpios, HC_RS04_N_GPIOS);
+
+		    gpio_reset_pin(gpios[0]);
+		    gpio_reset_pin(gpios[1]);
+		    gpio_set_direction(gpios[0], GPIO_MODE_OUTPUT);
+		    gpio_set_direction(gpios[1], GPIO_MODE_INPUT);
+		    gpio_set_level(gpios[0], 0);
+		}
+
+		size = 0;
+
+		nvs_app_get_blob_value(nvs_HC_RS04_PARAMETERS_key,NULL,&size);
+		if(size != 0)
+			nvs_app_get_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,&size);
+
+		hc_rs04_init();
+	}
+}
+
 void hc_rs04_init(void){
 
 	if(pthread_mutex_init(&mutex_hc_rs04, NULL) != 0){
 		ESP_LOGE(TAG,"Failed to initialize the HC_RS04 mutex");
 	}
 	else{
-	    // Create the queue
-	    cap_queue = xQueueCreate(1, sizeof(uint32_t));
+		int res_rec, res_sen;
 
-	    if (cap_queue == NULL) {
-	        ESP_LOGE(TAG, "Failed creating the message queue");
-	    }
-	    else{
-	    	int res;
+		res_rec = register_recollecter(&hc_rs04_get_sensors_data, &hc_rs04_get_sensors_gpios, &hc_rs04_get_sensors_additional_parameters);
+		res_sen = sensors_manager_add(&hc_rs04_destroy, &hc_rs04_add_sensor, &hc_rs04_delete_sensor, &hc_rs04_set_gpios, &hc_rs04_set_parameters, &hc_rs04_set_alert_values);
 
-	    	res = register_recollecter(&hc_rs04_get_sensor_data);
+		if(res_rec == 1 && res_sen == 1){
+			ESP_LOGI(TAG, "HC-RS04 recollecter successfully registered");
 
-			if(res == 1){
-				ESP_LOGI(TAG, "HC-RS04 recollecter successfully registered");
+			xTaskCreatePinnedToCore(&hc_rs04_task, "hc_rs04_task", HC_RS04_STACK_SIZE, NULL, HC_RS04_PRIORITY, &task_hc_rs04, HC_RS04_CORE_ID);
 
-				water_level_percentage = 0;
-
-				// Set echo pin
-				mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM_CAP_0, HC_RS04_ECHO_GPIO);
-				gpio_pulldown_en(HC_RS04_ECHO_GPIO);
-
-			    mcpwm_capture_config_t conf = {
-			        .cap_edge = MCPWM_BOTH_EDGE,
-			        .cap_prescale = 1,
-			        .capture_cb = hc_rs04_echo_isr_handler,
-			        .user_data = NULL
-			    };
-
-			    mcpwm_capture_enable_channel(MCPWM_UNIT_0, MCPWM_SELECT_CAP0, &conf);
-
-				// Set trig pin
-			    gpio_config_t io_conf = {
-			        .intr_type = GPIO_INTR_DISABLE,
-			        .mode = GPIO_MODE_OUTPUT,
-			        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-			        .pull_up_en = GPIO_PULLUP_DISABLE,
-			        .pin_bit_mask = BIT64(HC_RS04_TRIG_GPIO),
-			    };
-
-			    gpio_config(&io_conf);
-			    gpio_set_level(HC_RS04_TRIG_GPIO, 0);
-
-
-				xTaskCreatePinnedToCore(&hc_rs04_task, "hc_rs04_task", HC_RS04_STACK_SIZE, NULL, HC_RS04_PRIORITY, NULL, HC_RS04_CORE_ID);
-
-				g_hc_rs04_initialized = true;
-			}
-			else{
-				ESP_LOGE(TAG, "Error, HC-RS04 recollecter hasn't been registered");
-			}
-	    }
+			g_hc_rs04_initialized = true;
+		}
+		else{
+			ESP_LOGE(TAG, "Error, HC-RS04 recollecter or sensor manager hasn't been registered");
+		}
 	}
 }
 
-sensor_data_t hc_rs04_get_sensor_data(void){
+void hc_rs04_destroy(void){
 
-	sensor_data_t aux;
-	sensor_value_t *aux2;
-	int number_of_values = 1;
+	if(pthread_mutex_destroy(&mutex_hc_rs04) != 0){
+		ESP_LOGE(TAG,"Failed to destroy the HC-RS04 mutex");
+	}
+	else{
+		ESP_LOGI(TAG, "HC-RS04 recollecter and sensor manager successfully destroyed");
+
+		vTaskDelete(task_hc_rs04);
+
+		g_hc_rs04_initialized = false;
+	}
+}
+
+int hc_rs04_add_sensor(int* gpios, union sensor_value_u* parameters){
+
+	int res;
 
 	if(!g_hc_rs04_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the HC_RS04 without initializing it");
-		aux.valuesLen = 0;
-		return aux;
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return -1;
+	}
+
+	if(parameters[0].ival <= 0 || parameters[1].ival <= 0){
+		ESP_LOGE(TAG, "Error, the distances can't be 0 or less than 0 centimeters");
+		return -1;
+	}
+
+	res = gpios_manager_lock(gpios, HC_RS04_N_GPIOS);
+
+	if(res == 1){
+
+		pthread_mutex_lock(&mutex_hc_rs04);
+
+		ESP_LOGI(TAG, "Sensor installed");
+
+	    gpio_reset_pin(gpios[0]);
+	    gpio_reset_pin(gpios[1]);
+	    gpio_set_direction(gpios[0], GPIO_MODE_OUTPUT);
+	    gpio_set_direction(gpios[1], GPIO_MODE_INPUT);
+
+	    gpio_set_level(gpios[0], 0);
+
+		hc_rs04_cont++;
+
+		hc_rs04_additional_params_array = (hc_rs04_additional_params_t*) realloc(hc_rs04_additional_params_array, sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
+		hc_rs04_gpios_array = (hc_rs04_gpios_t*) realloc(hc_rs04_gpios_array, sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
+		hc_rs04_data_array = (hc_rs04_data_t*) realloc(hc_rs04_data_array, sizeof(hc_rs04_data_t) * hc_rs04_cont);
+
+		water_level_alert_counter = (int*) realloc(water_level_alert_counter, sizeof(int) * hc_rs04_cont);
+		water_level_is_alerted = (bool*) realloc(water_level_is_alerted, sizeof(bool) * hc_rs04_cont);
+
+		hc_rs04_additional_params_array[hc_rs04_cont - 1].distance_between_sensor_and_tank = parameters[0].ival;
+		hc_rs04_additional_params_array[hc_rs04_cont - 1].tank_length = parameters[1].ival;
+
+		hc_rs04_gpios_array[hc_rs04_cont - 1].trig = gpios[0];
+		hc_rs04_gpios_array[hc_rs04_cont - 1].echo = gpios[1];
+
+		hc_rs04_data_array[hc_rs04_cont - 1].water_level_percentage = 0.0;
+
+		water_level_alert_counter[hc_rs04_cont - 1] = 0;
+		water_level_is_alerted[hc_rs04_cont - 1] = false;
+
+		nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
+		nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
+		nvs_app_set_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,sizeof(hc_rs04_additional_params_t)*hc_rs04_cont);
+
+		pthread_mutex_unlock(&mutex_hc_rs04);
+	}
+
+	return res;
+}
+
+int hc_rs04_delete_sensor(int pos){
+
+	int res;
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return -1;
+	}
+
+	if(pos < 0 || pos >= hc_rs04_cont){
+		ESP_LOGE(TAG, "Error, the position is invalid");
+		return -1;
+	}
+
+	int gpios[HC_RS04_N_GPIOS] = {hc_rs04_gpios_array[pos].trig, hc_rs04_gpios_array[pos].echo};
+
+	res = gpios_manager_free(gpios, HC_RS04_N_GPIOS);
+
+	if(res == 1){
+
+		pthread_mutex_lock(&mutex_hc_rs04);
+
+		ESP_LOGI(TAG, "Sensor deleted");
+
+	    gpio_reset_pin(gpios[0]);
+	    gpio_reset_pin(gpios[1]);
+
+		shift_delete(pos);
+
+		hc_rs04_additional_params_array = (hc_rs04_additional_params_t*) realloc(hc_rs04_additional_params_array, sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
+		hc_rs04_gpios_array = (hc_rs04_gpios_t*) realloc(hc_rs04_gpios_array, sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
+		hc_rs04_data_array = (hc_rs04_data_t*) realloc(hc_rs04_data_array, sizeof(hc_rs04_data_t) * hc_rs04_cont);
+
+		water_level_alert_counter = (int*) realloc(water_level_alert_counter, sizeof(int) * hc_rs04_cont);
+		water_level_is_alerted = (bool*) realloc(water_level_is_alerted, sizeof(bool) * hc_rs04_cont);
+
+		nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
+		nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
+		nvs_app_set_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,sizeof(hc_rs04_additional_params_t)*hc_rs04_cont);
+
+		pthread_mutex_unlock(&mutex_hc_rs04);
+	}
+
+	return res;
+}
+
+int hc_rs04_set_gpios(int pos, int* gpios){
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return -1;
+	}
+
+	if(pos < 0 || pos >= hc_rs04_cont){
+		ESP_LOGE(TAG, "Error, the position is invalid");
+		return -1;
+	}
+
+	if(!gpios_manager_is_free(gpios[0]) || !gpios_manager_is_free(gpios[1])){
+		ESP_LOGE(TAG, "Error, the GPIOS selected are not available");
+		return -1;
 	}
 
 	pthread_mutex_lock(&mutex_hc_rs04);
 
-	aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * number_of_values);
+	int gpiosIns[HC_RS04_N_GPIOS] = {hc_rs04_gpios_array[pos].trig, hc_rs04_gpios_array[pos].echo};
 
-	strcpy(aux.sensorName, "HC-RS04");
-	aux.valuesLen = number_of_values;
-	aux.sensor_values = aux2;
+	gpios_manager_lock(gpios, HC_RS04_N_GPIOS);
 
-	aux.sensor_values[0].showOnLCD = HC_RS04_SHOW_WATER_LEVEL_ON_LCD;
-	strcpy(aux.sensor_values[0].valueName,"Water level");
-	aux.sensor_values[0].sensor_value_type = FLOAT;
-	aux.sensor_values[0].sensor_value.fval = water_level_percentage;
-	aux.sensor_values[0].upper_threshold.fval = HC_RS04_WATER_LEVEL_UPPER_THRESHOLD;
-	aux.sensor_values[0].lower_threshold.fval = HC_RS04_WATER_LEVEL_LOWER_THRESHOLD;
+	gpios_manager_free(gpiosIns, HC_RS04_N_GPIOS);
 
+    gpio_reset_pin(gpiosIns[0]);
+    gpio_reset_pin(gpiosIns[1]);
+
+    gpio_reset_pin(gpios[0]);
+    gpio_reset_pin(gpios[1]);
+    gpio_set_direction(gpios[0], GPIO_MODE_OUTPUT);
+    gpio_set_direction(gpios[1], GPIO_MODE_INPUT);
+
+    gpio_set_level(gpios[0], 0);
+
+	hc_rs04_gpios_array[pos].trig = gpios[0];
+	hc_rs04_gpios_array[pos].echo = gpios[1];
+
+	nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
+
+	return 1;
+}
+
+int hc_rs04_set_parameters(int pos, union sensor_value_u* parameters){
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return -1;
+	}
+
+	if(pos < 0 || pos >= hc_rs04_cont){
+		ESP_LOGE(TAG, "Error, the position is invalid");
+		return -1;
+	}
+
+	if(parameters[0].ival <= 0 || parameters[1].ival <= 0){
+		ESP_LOGE(TAG, "Error, the distances can't be 0 or less than 0 centimeters");
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_hc_rs04);
+
+	hc_rs04_additional_params_array[pos].distance_between_sensor_and_tank = parameters[0].ival;
+	hc_rs04_additional_params_array[pos].tank_length = parameters[1].ival;
+
+	nvs_app_set_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,sizeof(hc_rs04_additional_params_t)*hc_rs04_cont);
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
+
+	return 1;
+}
+
+int hc_rs04_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold){
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return -1;
+	}
+
+	if(value < 0 || value > 0){
+		ESP_LOGE(TAG, "Error, the value doesn't exist");
+		return -1;
+	}
+
+	if(n_ticks <= 0){
+		ESP_LOGE(TAG, "Error, the number of ticks can't be 0 or less than 0");
+		return -1;
+	}
+
+	if(upper_threshold.fval <= lower_threshold.fval){
+		ESP_LOGE(TAG, "Error, the thresholds don't make sense, upper is smaller than lower");
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_hc_rs04);
+
+	hc_rs04_alert_water_level = alert;
+	hc_rs04_water_level_ticks_to_alert = n_ticks;
+	hc_rs04_water_level_upper_threshold = upper_threshold.fval;
+	hc_rs04_water_level_lower_threshold = lower_threshold.fval;
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
+
+	return 1;
+}
+
+sensor_data_t* hc_rs04_get_sensors_data(int* number_of_sensors){
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return NULL;
+	}
+
+	if(hc_rs04_cont == 0){
+		ESP_LOGI(TAG, "There is no sensors of this type");
+		return NULL;
+	}
+
+	*number_of_sensors = hc_rs04_cont;
+
+	sensor_data_t* aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * hc_rs04_cont);
+	sensor_value_t *aux2;
+
+	pthread_mutex_lock(&mutex_hc_rs04);
+
+	for(int i = 0; i < hc_rs04_cont; i++){
+
+		aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * HC_RS04_N_VALUES);
+
+		strcpy(aux[i].sensorName, "HC-RS04");
+		aux[i].valuesLen = HC_RS04_N_VALUES;
+		aux[i].sensor_values = aux2;
+
+		aux[i].sensor_values[0].showOnLCD = HC_RS04_SHOW_WATER_LEVEL_ON_LCD;
+		strcpy(aux[i].sensor_values[0].valueName,"Water level");
+		aux[i].sensor_values[0].sensor_value_type = FLOAT;
+		aux[i].sensor_values[0].sensor_value.fval = hc_rs04_data_array[i].water_level_percentage;
+		aux[i].sensor_values[0].alert = hc_rs04_alert_water_level;
+		aux[i].sensor_values[0].ticks_to_alert = hc_rs04_water_level_ticks_to_alert;
+		aux[i].sensor_values[0].upper_threshold.fval = hc_rs04_water_level_upper_threshold;
+		aux[i].sensor_values[0].lower_threshold.fval = hc_rs04_water_level_lower_threshold;
+	}
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
+
+	return aux;
+}
+
+sensor_gpios_info_t* hc_rs04_get_sensors_gpios(int* number_of_sensors){
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return NULL;
+	}
+
+	if(hc_rs04_cont == 0){
+		ESP_LOGI(TAG, "There is no sensors of this type");
+		return NULL;
+	}
+
+	*number_of_sensors = hc_rs04_cont;
+
+	sensor_gpios_info_t* aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * hc_rs04_cont);
+	sensor_gpio_t *aux2;
+
+	pthread_mutex_lock(&mutex_hc_rs04);
+
+	for(int i = 0; i < hc_rs04_cont; i++){
+
+		aux2 = (sensor_gpio_t *)malloc(sizeof(sensor_gpio_t) * HC_RS04_N_GPIOS);
+
+		aux[i].gpiosLen = HC_RS04_N_GPIOS;
+		aux[i].sensor_gpios = aux2;
+
+		strcpy(aux[i].sensor_gpios[0].gpioName,"Trig");
+		aux[i].sensor_gpios[0].sensor_gpio = hc_rs04_gpios_array[i].trig;
+
+		strcpy(aux[i].sensor_gpios[1].gpioName,"Echo");
+		aux[i].sensor_gpios[1].sensor_gpio = hc_rs04_gpios_array[i].echo;
+	}
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
+
+	return aux;
+}
+
+sensor_additional_parameters_info_t* hc_rs04_get_sensors_additional_parameters(int* number_of_sensors){
+
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
+		return NULL;
+	}
+
+	if(hc_rs04_cont == 0){
+		ESP_LOGI(TAG, "There is no sensors of this type");
+		return NULL;
+	}
+
+	*number_of_sensors = hc_rs04_cont;
+
+	sensor_additional_parameters_info_t* aux = (sensor_additional_parameters_info_t*) malloc(sizeof(sensor_additional_parameters_info_t) * hc_rs04_cont);
+	sensor_additional_parameter_t *aux2;
+
+	pthread_mutex_lock(&mutex_hc_rs04);
+
+	for(int i = 0; i < hc_rs04_cont; i++){
+
+		aux2 = (sensor_additional_parameter_t *)malloc(sizeof(sensor_additional_parameter_t) * HC_RS04_N_ADDITIONAL_PARAMS);
+
+		aux[i].parametersLen = HC_RS04_N_ADDITIONAL_PARAMS;
+		aux[i].sensor_parameters = aux2;
+
+		strcpy(aux[i].sensor_parameters[0].parameterName,"Sensor - Tank (cm)");
+		aux[i].sensor_parameters[0].sensor_parameter_type = INTEGER;
+		aux[i].sensor_parameters[0].sensor_parameter.ival = hc_rs04_additional_params_array[i].distance_between_sensor_and_tank;
+
+		strcpy(aux[i].sensor_parameters[1].parameterName,"Tank depth (cm)");
+		aux[i].sensor_parameters[1].sensor_parameter_type = INTEGER;
+		aux[i].sensor_parameters[1].sensor_parameter.ival = hc_rs04_additional_params_array[i].tank_length;
+	}
 
 	pthread_mutex_unlock(&mutex_hc_rs04);
 
