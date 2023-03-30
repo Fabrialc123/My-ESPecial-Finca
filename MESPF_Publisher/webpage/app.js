@@ -786,7 +786,16 @@ function triggerAlertsDiv(i){
 
 function submitWifiConf()
 {
-	window.alert("SSID: " + document.getElementById('WIFI_SSID').value + "\n" + "PASSWORD: " + document.getElementById('WIFI_PASS').value);
+	var xhr = new XMLHttpRequest();
+    var requestURL = "/setWIFIConfiguration";		//setWIFIConfiguration has to be handled
+    xhr.open('POST', requestURL, false);
+    xhr.send(document.getElementById('WIFI_SSID').value + "\n" 
+    		+ document.getElementById('WIFI_PASS').value + "\0");
+    
+    if (xhr.readyState == 4 && xhr.status == 200) {
+    	window.alert(xhr.responseText);
+    }else window.alert("Something went wrong!");
+    
 	document.getElementById('WIFI_SSID').disabled = true;
 	document.getElementById('WIFI_PASS').disabled = true;
 	document.getElementById('WIFI_EDIT').hidden = false;
