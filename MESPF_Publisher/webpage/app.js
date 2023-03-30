@@ -203,7 +203,7 @@ function getSensorsConfiguration(){
     	
     	sensorsInstalled = data["nSensors"];
     	
-    	for(let i = 0; i < sensorsInstalled; i++){
+    	for(let i = 1; i < sensorsInstalled; i++){
     		
     		name = data["sensors"][i].sensorName;
     		nUnits = data["sensors"][i].numberOfUnits;
@@ -1070,7 +1070,7 @@ function changeTab(number){
 			
 	if(number == 0){
 		$('#status_button').attr('disabled', true);
-		document.getElementById('ESP_STATUS').style.display = "block";
+		document.getElementById('sensor_0').style.display = "block";
 	}
 	else if(number == 1){
 		$('#configurations_button').attr('disabled', true);
@@ -1092,7 +1092,7 @@ function unlockTab(){
 	
 	if(tab == 0){
 		$('#status_button').attr('disabled', false);
-		document.getElementById('ESP_STATUS').style.display = "none";
+		document.getElementById('sensor_0').style.display = "none";
 	}
 	else if(tab == 1){
 		$('#configurations_button').attr('disabled', false);
