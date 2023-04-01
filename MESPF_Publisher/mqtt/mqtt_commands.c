@@ -47,31 +47,38 @@ void mqtt_app_process_command(char* topic,char* data){
 }
 
 void mqtt_app_send_info(char* topic){
-	int i, recollecters ,len;
+	int i,j, recollecters ,len, sensors;
 	char data[MQTT_APP_MAX_DATA_LENGTH];
 	char personal_name[MQTT_APP_MAX_DATA_LENGTH];
 	char sensorName[CHAR_LENGTH];
 	char sensor_topic[MQTT_APP_MAX_TOPIC_LENGTH];
+	char num_sensor[CHAR_LENGTH];
 
 	mqtt_app_getID(personal_name);
 
 	recollecters = get_recollecters_size();
 	for (i = 0; i < recollecters;i++){
-		memset(&data, 0, MQTT_APP_MAX_DATA_LENGTH);
-		memset(&sensorName, 0, CHAR_LENGTH);
 		memset(&sensor_topic, 0, MQTT_APP_MAX_TOPIC_LENGTH);
+		get_sensor_data(i,&sensors);
+		for(j = 0; j < sensors;j++){
+			memset(&data, 0, MQTT_APP_MAX_DATA_LENGTH);
+			memset(&sensorName, 0, CHAR_LENGTH);
+			memset(&num_sensor,0,CHAR_LENGTH);
+			len = get_sensor_data_json (i,j, data, sensorName);
+			if (len < 0 || len >= MQTT_APP_MAX_DATA_LENGTH){
+				ESP_LOGE(TAG2, "ERROR in get_sensor_data(sensor_id = %d)", i);
+				return;
+			}
 
-		len = get_sensor_data_json (i, data, sensorName);
-		if (len < 0 || len >= MQTT_APP_MAX_DATA_LENGTH){
-			ESP_LOGE(TAG2, "ERROR in get_sensor_data(sensor_id = %d)", i);
-			return;
+			itoa(j+1,num_sensor,10);
+
+			if (strcmp(topic,SENSORS_TOPIC) == 0){
+				concatenate_topic(SENSORS_TOPIC, personal_name, sensorName, num_sensor, INFO_TOPIC, NULL, NULL, sensor_topic);
+			}else {
+				concatenate_topic(USERS_TOPIC,topic,REFRESH_RESP_TOPIC, personal_name, sensorName, num_sensor, INFO_TOPIC, sensor_topic);
+			}
+			mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, sensor_topic, data);
 		}
-		if (strcmp(topic,SENSORS_TOPIC) == 0){
-			concatenate_topic(SENSORS_TOPIC, personal_name, sensorName, "1", INFO_TOPIC, NULL, NULL, sensor_topic);
-		}else {
-			concatenate_topic(USERS_TOPIC,topic,REFRESH_RESP_TOPIC, personal_name, sensorName, "1", INFO_TOPIC, sensor_topic);
-		}
-		mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, sensor_topic, data);
 	}
 }
 
