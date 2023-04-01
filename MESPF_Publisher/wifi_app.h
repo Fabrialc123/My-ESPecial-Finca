@@ -11,7 +11,7 @@
 #include "esp_netif.h"
 
 
-#define WIFI_MAX_CONN_RETRIES		30
+#define WIFI_MAX_CONN_RETRIES		10
 
 #define WIFI_AP_CHANNEL				1				// For more details see the bandwidth of WiFi Channels and the ESP32 documentation
 #define	WIFI_AP_SSID_HIDDEN			0
