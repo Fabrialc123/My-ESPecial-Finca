@@ -705,6 +705,52 @@ static esp_err_t SensorEditAlerts_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
+static esp_err_t ValidateInfo_handler(httpd_req_t *req){
+	char buf[500], response[30], *parameter_type;
+	int recv_len, type, n_gpios, *gpios, n_parameters, res;
+	union sensor_value_u *parameters;
+
+	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
+
+	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
+	else {
+		n_gpios = atoi(strtok(buf,"\n"));
+
+		gpios = (int*) malloc(sizeof(int) * n_gpios);
+
+		for(int i = 0; i < n_gpios; i++){
+			gpios[i] = atoi(strtok(NULL,"\n"));
+		}
+
+		n_parameters = atoi(strtok(NULL,"\n"));
+
+		parameters = (union sensor_value_u*) malloc(sizeof(union sensor_value_u) * n_parameters);
+
+		for(int i = 0; i < n_parameters; i++){
+			parameter_type = strtok(NULL,"\n");
+
+			if(strcmp(parameter_type, "INTEGER") == 0)
+				parameters[i].ival = atoi(strtok(NULL,"\n"));
+			else if(strcmp(parameter_type, "FLOAT") == 0)
+				parameters[i].fval = atof(strtok(NULL,"\n"));
+			else
+				strcpy(parameters[i].cval, strtok(NULL,"\n"));
+		}
+
+		type =  atoi(strtok(NULL,"\n"));
+
+		sensors_manager_validate_info(type, gpios, parameters, response);
+
+		free(gpios);
+		free(parameters);
+	}
+
+	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+	httpd_resp_send(req, response, strlen(response));
+
+	return ESP_OK;
+}
+
 /**
  * Sets up default httpd server configuration
  * @return http server instance handle if successful, NULL otherwise
@@ -922,6 +968,14 @@ static httpd_handle_t http_server_configure(void){
 			.user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorEditAlerts));
+
+	    httpd_uri_t ValidateInfo = {
+			.uri = "/ValidateInfo",
+			.method = HTTP_POST,
+			.handler = ValidateInfo_handler,
+			.user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &ValidateInfo));
 
 		return http_server_handle;
 	}
