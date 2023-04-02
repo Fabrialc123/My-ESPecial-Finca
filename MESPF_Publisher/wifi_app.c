@@ -44,7 +44,7 @@ static char nvs_WIFI_STA_PASSWORD[64] = "EXAMPLE_PASSWORD";
 static char WIFI_AP_PASSWORD[64] = "MESPF123";
 
 static short int WIFI_CONNECTED = -1;
-static int s_retry_num = 0;
+static unsigned int s_retry_num = 0;
 static wifi_mode_t WIFI_MODE = WIFI_MODE_STA;
 
 
@@ -226,6 +226,8 @@ static void wifi_app_task (void *pvParameters){
 	wifi_app_default_wifi_init();
 	wifi_app_sta_config();
 	//wifi_app_soft_ap_config();
+
+	s_retry_num = WIFI_MAX_CONN_RETRIES - 3;
 
 	ESP_ERROR_CHECK(esp_wifi_start());
 
