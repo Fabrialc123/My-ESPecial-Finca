@@ -18,6 +18,7 @@ typedef int (*set_parameters_function)(int,union sensor_value_u*);
 typedef int (*set_alert_values_function)(int,bool,int,union sensor_value_u,union sensor_value_u);
 
 void sensors_manager_sensors_startup(void);
+void sensors_manager_validate_info(int type, int *gpios, union sensor_value_u *parameters, char *resp);
 
 void sensors_manager_init(void);
 int sensors_manager_add(destroy_sensor_function des, add_unit_function aun, delete_unit_function dun, set_gpios_function sgp, set_parameters_function spa, set_alert_values_function sal);
