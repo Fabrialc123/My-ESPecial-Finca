@@ -476,7 +476,7 @@ void get_sensors_alerts_json(char *data){
 
 		sensor_data = get_sensor_data(i, &number_of_sensors);
 
-		if(sensor_data != NULL){
+		if(sensor_data != NULL && strcmp(sensor_data[i].sensorName, "STATUS") != 0){
 
 			if(!first){
 				strcat(data, ",");
