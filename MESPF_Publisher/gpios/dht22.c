@@ -425,7 +425,11 @@ int dht22_delete_sensor(int pos){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_dht22);
+
 	if(pos < 0 || pos >= dht22_cont){
+		pthread_mutex_unlock(&mutex_dht22);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
@@ -433,8 +437,6 @@ int dht22_delete_sensor(int pos){
 	res = gpios_manager_free(&dht22_gpios_array[pos].data, DHT22_N_GPIOS);
 
 	if(res == 1){
-
-		pthread_mutex_lock(&mutex_dht22);
 
 		ESP_LOGI(TAG, "Sensor deleted");
 
@@ -451,9 +453,9 @@ int dht22_delete_sensor(int pos){
 
 		nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
 		nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
-
-		pthread_mutex_unlock(&mutex_dht22);
 	}
+
+	pthread_mutex_unlock(&mutex_dht22);
 
 	return res;
 }
@@ -465,17 +467,21 @@ int dht22_set_gpios(int pos, int* gpios){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_dht22);
+
 	if(pos < 0 || pos >= dht22_cont){
+		pthread_mutex_unlock(&mutex_dht22);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
 
 	if(!gpios_manager_is_free(gpios[0])){
+		pthread_mutex_unlock(&mutex_dht22);
+
 		ESP_LOGE(TAG, "Error, the GPIO selected is not available");
 		return -1;
 	}
-
-	pthread_mutex_lock(&mutex_dht22);
 
 	gpios_manager_lock(gpios, DHT22_N_GPIOS);
 
@@ -538,12 +544,18 @@ int dht22_set_alert_values(int value, bool alert, int n_ticks, union sensor_valu
 
 sensor_data_t* dht22_get_sensors_data(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_dht22_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_dht22);
+
 	if(dht22_cont == 0){
+		pthread_mutex_unlock(&mutex_dht22);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -552,8 +564,6 @@ sensor_data_t* dht22_get_sensors_data(int* number_of_sensors){
 
 	sensor_data_t* aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * dht22_cont);
 	sensor_value_t *aux2;
-
-	pthread_mutex_lock(&mutex_dht22);
 
 	for(int i = 0; i < dht22_cont; i++){
 
@@ -589,12 +599,18 @@ sensor_data_t* dht22_get_sensors_data(int* number_of_sensors){
 
 sensor_gpios_info_t* dht22_get_sensors_gpios(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_dht22_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_dht22);
+
 	if(dht22_cont == 0){
+		pthread_mutex_unlock(&mutex_dht22);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -603,8 +619,6 @@ sensor_gpios_info_t* dht22_get_sensors_gpios(int* number_of_sensors){
 
 	sensor_gpios_info_t* aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * dht22_cont);
 	sensor_gpio_t *aux2;
-
-	pthread_mutex_lock(&mutex_dht22);
 
 	for(int i = 0; i < dht22_cont; i++){
 
