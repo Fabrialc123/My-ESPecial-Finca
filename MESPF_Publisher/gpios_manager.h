@@ -57,5 +57,12 @@ int* gpios_manager_get_availables(void);
  */
 void gpios_manager_json(char *data);
 
+/**
+ * Check if GPIO is ADC1
+ *
+ * return true if it is, false if not
+ */
+bool gpios_manager_check_adc1(int gpio);
+
 
 #endif /* MAIN_GPIOS_MANAGER_H_ */
