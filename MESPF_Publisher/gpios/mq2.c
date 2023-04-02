@@ -318,7 +318,11 @@ int mq2_delete_sensor(int pos){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_mq2);
+
 	if(pos < 0 || pos >= mq2_cont){
+		pthread_mutex_unlock(&mutex_mq2);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
@@ -326,8 +330,6 @@ int mq2_delete_sensor(int pos){
 	res = gpios_manager_free(&mq2_gpios_array[pos].a0, MQ2_N_GPIOS);
 
 	if(res == 1){
-
-		pthread_mutex_lock(&mutex_mq2);
 
 		ESP_LOGI(TAG, "Sensor deleted");
 
@@ -341,9 +343,9 @@ int mq2_delete_sensor(int pos){
 
 		nvs_app_set_uint8_value(nvs_MQ2_CONT_key,(uint8_t)mq2_cont);
 		nvs_app_set_blob_value(nvs_MQ2_GPIOS_key,mq2_gpios_array,sizeof(mq2_gpios_t)*mq2_cont);
-
-		pthread_mutex_unlock(&mutex_mq2);
 	}
+
+	pthread_mutex_unlock(&mutex_mq2);
 
 	return res;
 }
@@ -355,17 +357,21 @@ int mq2_set_gpios(int pos, int* gpios){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_mq2);
+
 	if(pos < 0 || pos >= mq2_cont){
+		pthread_mutex_unlock(&mutex_mq2);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
 
 	if(!gpios_manager_is_free(gpios[0])){
+		pthread_mutex_unlock(&mutex_mq2);
+
 		ESP_LOGE(TAG, "Error, the GPIO selected is not available");
 		return -1;
 	}
-
-	pthread_mutex_lock(&mutex_mq2);
 
 	gpios_manager_lock(gpios, MQ2_N_GPIOS);
 
@@ -420,12 +426,18 @@ int mq2_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_
 
 sensor_data_t* mq2_get_sensors_data(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_mq2_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the MQ2 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_mq2);
+
 	if(mq2_cont == 0){
+		pthread_mutex_unlock(&mutex_mq2);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -434,8 +446,6 @@ sensor_data_t* mq2_get_sensors_data(int* number_of_sensors){
 
 	sensor_data_t* aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * mq2_cont);
 	sensor_value_t *aux2;
-
-	pthread_mutex_lock(&mutex_mq2);
 
 	for(int i = 0; i < mq2_cont; i++){
 
@@ -462,12 +472,18 @@ sensor_data_t* mq2_get_sensors_data(int* number_of_sensors){
 
 sensor_gpios_info_t* mq2_get_sensors_gpios(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_mq2_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the MQ2 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_mq2);
+
 	if(mq2_cont == 0){
+		pthread_mutex_unlock(&mutex_mq2);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -476,8 +492,6 @@ sensor_gpios_info_t* mq2_get_sensors_gpios(int* number_of_sensors){
 
 	sensor_gpios_info_t* aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * mq2_cont);
 	sensor_gpio_t *aux2;
-
-	pthread_mutex_lock(&mutex_mq2);
 
 	for(int i = 0; i < mq2_cont; i++){
 
