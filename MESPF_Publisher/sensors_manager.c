@@ -97,12 +97,14 @@ int sensors_manager_delete(int id){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
-
-	pthread_mutex_lock(&mutex_sensors_manager);
 
 	ESP_LOGI(TAG, "Sensor deleted");
 
@@ -170,17 +172,23 @@ int sensors_manager_destroy_sensor(int id){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
 
 	destroy_sensor_function foo = destroy_sensor[id];
 
+	pthread_mutex_unlock(&mutex_sensors_manager);
+
 	foo();
 
 	sensors_manager_delete(id);
-	delete_recollecter(id);
+	delete_recollecter(id + 1);
 
 	return 1;
 }
@@ -192,12 +200,18 @@ int sensors_manager_add_sensor_unit(int id, int* gpios, union sensor_value_u* pa
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
 
 	add_unit_function foo = add_unit[id];
+
+	pthread_mutex_unlock(&mutex_sensors_manager);
 
 	return foo(gpios, parameters);
 }
@@ -209,12 +223,18 @@ int sensors_manager_delete_sensor_unit(int id, int pos){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
 
 	delete_unit_function foo = delete_unit[id];
+
+	pthread_mutex_unlock(&mutex_sensors_manager);
 
 	return foo(pos);
 }
@@ -226,12 +246,18 @@ int sensors_manager_set_gpios(int id, int pos, int* gpios){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
 
 	set_gpios_function foo = set_gpios[id];
+
+	pthread_mutex_unlock(&mutex_sensors_manager);
 
 	return foo(pos, gpios);
 }
@@ -243,12 +269,18 @@ int sensors_manager_set_parameters(int id, int pos, union sensor_value_u* parame
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
 
 	set_parameters_function foo = set_parameters[id];
+
+	pthread_mutex_unlock(&mutex_sensors_manager);
 
 	return foo(pos, parameters);
 }
@@ -260,12 +292,18 @@ int sensors_manager_set_alert_values(int id, int value, bool alert, int ticks, u
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_sensors_manager);
+
 	if(id < 0 || id >= sensors_manager_n){
+		pthread_mutex_unlock(&mutex_sensors_manager);
+
 		ESP_LOGE(TAG, "Error, inexistent id");
 		return -1;
 	}
 
 	set_alert_values_function foo = set_alert_values[id];
+
+	pthread_mutex_unlock(&mutex_sensors_manager);
 
 	return foo(value, alert, ticks, upperThreshold, lowerThreshold);
 }
