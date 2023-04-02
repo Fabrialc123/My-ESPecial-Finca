@@ -317,7 +317,11 @@ int so_sen_delete_sensor(int pos){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_so_sen);
+
 	if(pos < 0 || pos >= so_sen_cont){
+		pthread_mutex_unlock(&mutex_so_sen);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
@@ -325,8 +329,6 @@ int so_sen_delete_sensor(int pos){
 	res = gpios_manager_free(&so_sen_gpios_array[pos].a0, SO_SEN_N_GPIOS);
 
 	if(res == 1){
-
-		pthread_mutex_lock(&mutex_so_sen);
 
 		ESP_LOGI(TAG, "Sensor deleted");
 
@@ -340,9 +342,9 @@ int so_sen_delete_sensor(int pos){
 
 		nvs_app_set_uint8_value(nvs_SO_SEN_CONT_key,(uint8_t)so_sen_cont);
 		nvs_app_set_blob_value(nvs_SO_SEN_GPIOS_key,so_sen_gpios_array,sizeof(so_sen_gpios_t)*so_sen_cont);
-
-		pthread_mutex_unlock(&mutex_so_sen);
 	}
+
+	pthread_mutex_unlock(&mutex_so_sen);
 
 	return res;
 }
@@ -354,17 +356,21 @@ int so_sen_set_gpios(int pos, int* gpios){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_so_sen);
+
 	if(pos < 0 || pos >= so_sen_cont){
+		pthread_mutex_unlock(&mutex_so_sen);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
 
 	if(!gpios_manager_is_free(gpios[0])){
+		pthread_mutex_unlock(&mutex_so_sen);
+
 		ESP_LOGE(TAG, "Error, the GPIO selected is not available");
 		return -1;
 	}
-
-	pthread_mutex_lock(&mutex_so_sen);
 
 	gpios_manager_lock(gpios, SO_SEN_N_GPIOS);
 
@@ -419,12 +425,18 @@ int so_sen_set_alert_values(int value, bool alert, int n_ticks, union sensor_val
 
 sensor_data_t* so_sen_get_sensors_data(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_so_sen_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the SO_SEN without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_so_sen);
+
 	if(so_sen_cont == 0){
+		pthread_mutex_unlock(&mutex_so_sen);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -433,8 +445,6 @@ sensor_data_t* so_sen_get_sensors_data(int* number_of_sensors){
 
 	sensor_data_t* aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * so_sen_cont);
 	sensor_value_t *aux2;
-
-	pthread_mutex_lock(&mutex_so_sen);
 
 	for(int i = 0; i < so_sen_cont; i++){
 
@@ -461,12 +471,18 @@ sensor_data_t* so_sen_get_sensors_data(int* number_of_sensors){
 
 sensor_gpios_info_t* so_sen_get_sensors_gpios(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_so_sen_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the SO_SEN without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_so_sen);
+
 	if(so_sen_cont == 0){
+		pthread_mutex_unlock(&mutex_so_sen);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -475,8 +491,6 @@ sensor_gpios_info_t* so_sen_get_sensors_gpios(int* number_of_sensors){
 
 	sensor_gpios_info_t* aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * so_sen_cont);
 	sensor_gpio_t *aux2;
-
-	pthread_mutex_lock(&mutex_so_sen);
 
 	for(int i = 0; i < so_sen_cont; i++){
 
