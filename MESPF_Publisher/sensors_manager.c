@@ -9,6 +9,7 @@
 #include "string.h"
 
 #include "sensors_manager.h"
+#include "gpios_manager.h"
 #include <stdbool.h>
 #include <pthread.h>
 
@@ -36,6 +37,47 @@ void sensors_manager_sensors_startup(void){
 	dht22_startup();
 	hc_rs04_startup();
 	so_sen_startup();
+}
+
+void sensors_manager_validate_info(int type, int *gpios, union sensor_value_u *parameters, char *response){
+
+	switch (type) {
+		case 0:{
+			if(!gpios_manager_is_free(gpios[0]))
+				sprintf(response,"GPIO %d not available", gpios[0]);
+			else if(!gpios_manager_check_adc1(gpios[0]))
+				sprintf(response,"GPIO %d is not an ADC1", gpios[0]);
+			else
+				sprintf(response,"Info is valid");
+		}break;
+		case 1:{
+			if(!gpios_manager_is_free(gpios[0]))
+				sprintf(response,"GPIO %d not available", gpios[0]);
+			else
+				sprintf(response,"Info is valid");
+		}break;
+		case 2:{
+			if(!gpios_manager_is_free(gpios[0]))
+				sprintf(response,"GPIO %d not available", gpios[0]);
+			else if(!gpios_manager_is_free(gpios[1]))
+				sprintf(response,"GPIO %d not available", gpios[1]);
+			else if(parameters[0].ival <= 0 || parameters[1].ival <= 0)
+				sprintf(response,"Params must be more than 0");
+			else
+				sprintf(response,"Info is valid");
+		}break;
+		case 3:{
+			if(!gpios_manager_is_free(gpios[0]))
+				sprintf(response,"GPIO %d not available", gpios[0]);
+			else if(!gpios_manager_check_adc1(gpios[0]))
+				sprintf(response,"GPIO %d is not an ADC1", gpios[0]);
+			else
+				sprintf(response,"Info is valid");
+		}break;
+		default:{
+			sprintf(response, "Unknown type");
+		}break;
+	}
 }
 
 void sensors_manager_init(void){
