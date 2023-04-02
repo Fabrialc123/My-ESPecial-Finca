@@ -437,7 +437,7 @@ function sensorsGpiosUpdate(){
 		
 		var sensor_n_units, sensor_n_gpios; 
 		
-		for(let i = 0; i < sensorsInstalled; i++){
+		for(let i = 1; i < sensorsInstalled; i++){
 			
 			sensor_n_units = document.getElementById("sensor_" + i).dataset.sensor_n_units;
 			sensor_n_gpios = document.getElementById("sensor_" + i).dataset.sensor_n_gpios;
@@ -460,7 +460,7 @@ function sensorsParametersUpdate(){
 		
 		var sensor_n_units, sensor_n_parameters;
 		
-		for(let i = 0; i < sensorsInstalled; i++){
+		for(let i = 1; i < sensorsInstalled; i++){
 			
 			sensor_n_units = document.getElementById("sensor_" + i).dataset.sensor_n_units;
 			sensor_n_parameters = document.getElementById("sensor_" + i).dataset.sensor_n_parameters;
@@ -483,7 +483,7 @@ function sensorsAlertsUpdate(){
 		
 		var sensor_n_values;
 		
-		for(let i = 0; i < sensorsInstalled; i++){
+		for(let i = 1; i < sensorsInstalled; i++){
 			
 			sensor_n_values = document.getElementById("sensor_" + i).dataset.sensor_n_values;
 			
