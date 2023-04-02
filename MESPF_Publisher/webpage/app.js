@@ -644,7 +644,7 @@ function processData(type){
 				k++;
 		}
 		
-		if(ok){
+		if(ok && validInfo(type, nGpios, nParameters)){
 			if(id == sensorsInstalled){
 				addSensor(type);
 			}
@@ -668,6 +668,37 @@ function sensorLocation(sensor){
 	}
 	
 	return i;
+}
+
+function validInfo(type, nGpios, nParameters){
+	
+	var gpios = "", parameters = "";
+	
+	for(let i = 0; i < nGpios; i++){
+		gpios += gpioOptions[document.getElementById("gpio_"+ i).value] + "\n";
+	}
+	
+	for(let i = 0; i < nParameters; i++){
+		parameters += document.getElementById("parameter_"+ i + "_type").value + "\n";
+		parameters += document.getElementById("parameter_"+ i).value + "\n";
+	}
+	
+	// Http Request
+	var request = new XMLHttpRequest();
+	var requestURL = "/ValidateInfo";		//ValidateInfo has to be handled
+	
+	request.open('POST', requestURL, false);
+	
+	request.send(nGpios + "\n" + gpios + nParameters + "\n" + parameters + type + "\0");
+	
+    if (request.readyState == 4 && request.status == 200) {
+    	window.alert(request.responseText);
+    }
+    
+    if(request.responseText === "Info is valid")
+    	return true;
+    else
+    	return false;
 }
 
 function addSensorUnit(id, nGpios, nParameters){
