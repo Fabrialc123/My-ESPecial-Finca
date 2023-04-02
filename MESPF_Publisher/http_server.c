@@ -506,7 +506,7 @@ static esp_err_t SensorUnitAddition_handler(httpd_req_t *req){
 
 		i =  atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_add_sensor_unit(i, gpios, parameters);
+		res = sensors_manager_add_sensor_unit(i - 1, gpios, parameters);
 
 		if(res == 1)
 			sprintf(response,"Sensor unit added");
@@ -534,7 +534,7 @@ static esp_err_t SensorDeletion_handler(httpd_req_t *req){
 	else {
 		i = atoi(strtok(buf,"\n"));
 
-		res = sensors_manager_destroy_sensor(i);
+		res = sensors_manager_destroy_sensor(i - 1);
 
 		if(res == 1)
 			sprintf(response,"Sensor deleted");
@@ -559,7 +559,7 @@ static esp_err_t SensorUnitDeletion_handler(httpd_req_t *req){
 		i = atoi(strtok(buf,"\n"));
 		j = atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_delete_sensor_unit(i,j);
+		res = sensors_manager_delete_sensor_unit(i - 1,j);
 
 		if(res == 1)
 			sprintf(response,"Sensor unit deleted");
@@ -593,7 +593,7 @@ static esp_err_t SensorEditGpios_handler(httpd_req_t *req){
 
 		j =  atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_set_gpios(i, j, gpios);
+		res = sensors_manager_set_gpios(i - 1, j, gpios);
 
 		if(res == 1)
 			sprintf(response,"GPIOS changed");
@@ -637,7 +637,7 @@ static esp_err_t SensorEditParameters_handler(httpd_req_t *req){
 
 		j =  atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_set_parameters(i, j, parameters);
+		res = sensors_manager_set_parameters(i - 1, j, parameters);
 
 		if(res == 1)
 			sprintf(response,"Parameters changed");
@@ -691,7 +691,7 @@ static esp_err_t SensorEditAlerts_handler(httpd_req_t *req){
 			strcpy(lowerThreshold.cval, strtok(NULL,"\n"));
 		}
 
-		res = sensors_manager_set_alert_values(i, value, alert, ticks, upperThreshold, lowerThreshold);
+		res = sensors_manager_set_alert_values(i - 1, value, alert, ticks, upperThreshold, lowerThreshold);
 
 		if(res == 1)
 			sprintf(response,"Alert changed");
