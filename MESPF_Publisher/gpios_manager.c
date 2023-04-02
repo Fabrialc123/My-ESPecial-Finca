@@ -276,3 +276,12 @@ void gpios_manager_json(char *data){
 
 	strcat(data, "]}");
 }
+
+bool gpios_manager_check_adc1(int gpio){
+	switch (gpio) {
+		case 36: case 37: case 38: case 39: case 32: case 33: case 34: case 35:
+			return true;
+		default:
+			return false;
+	}
+}
