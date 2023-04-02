@@ -341,7 +341,11 @@ int hc_rs04_delete_sensor(int pos){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_hc_rs04);
+
 	if(pos < 0 || pos >= hc_rs04_cont){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
@@ -351,8 +355,6 @@ int hc_rs04_delete_sensor(int pos){
 	res = gpios_manager_free(gpios, HC_RS04_N_GPIOS);
 
 	if(res == 1){
-
-		pthread_mutex_lock(&mutex_hc_rs04);
 
 		ESP_LOGI(TAG, "Sensor deleted");
 
@@ -371,9 +373,9 @@ int hc_rs04_delete_sensor(int pos){
 		nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
 		nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
 		nvs_app_set_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,sizeof(hc_rs04_additional_params_t)*hc_rs04_cont);
-
-		pthread_mutex_unlock(&mutex_hc_rs04);
 	}
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
 
 	return res;
 }
@@ -385,17 +387,21 @@ int hc_rs04_set_gpios(int pos, int* gpios){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_hc_rs04);
+
 	if(pos < 0 || pos >= hc_rs04_cont){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
 
 	if(!gpios_manager_is_free(gpios[0]) || !gpios_manager_is_free(gpios[1])){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGE(TAG, "Error, the GPIOS selected are not available");
 		return -1;
 	}
-
-	pthread_mutex_lock(&mutex_hc_rs04);
 
 	int gpiosIns[HC_RS04_N_GPIOS] = {hc_rs04_gpios_array[pos].trig, hc_rs04_gpios_array[pos].echo};
 
@@ -430,17 +436,21 @@ int hc_rs04_set_parameters(int pos, union sensor_value_u* parameters){
 		return -1;
 	}
 
+	pthread_mutex_lock(&mutex_hc_rs04);
+
 	if(pos < 0 || pos >= hc_rs04_cont){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGE(TAG, "Error, the position is invalid");
 		return -1;
 	}
 
 	if(parameters[0].ival <= 0 || parameters[1].ival <= 0){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGE(TAG, "Error, the distances can't be 0 or less than 0 centimeters");
 		return -1;
 	}
-
-	pthread_mutex_lock(&mutex_hc_rs04);
 
 	hc_rs04_additional_params_array[pos].distance_between_sensor_and_tank = parameters[0].ival;
 	hc_rs04_additional_params_array[pos].tank_length = parameters[1].ival;
@@ -488,12 +498,18 @@ int hc_rs04_set_alert_values(int value, bool alert, int n_ticks, union sensor_va
 
 sensor_data_t* hc_rs04_get_sensors_data(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_hc_rs04_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_hc_rs04);
+
 	if(hc_rs04_cont == 0){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -502,8 +518,6 @@ sensor_data_t* hc_rs04_get_sensors_data(int* number_of_sensors){
 
 	sensor_data_t* aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * hc_rs04_cont);
 	sensor_value_t *aux2;
-
-	pthread_mutex_lock(&mutex_hc_rs04);
 
 	for(int i = 0; i < hc_rs04_cont; i++){
 
@@ -530,12 +544,18 @@ sensor_data_t* hc_rs04_get_sensors_data(int* number_of_sensors){
 
 sensor_gpios_info_t* hc_rs04_get_sensors_gpios(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_hc_rs04_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_hc_rs04);
+
 	if(hc_rs04_cont == 0){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -544,8 +564,6 @@ sensor_gpios_info_t* hc_rs04_get_sensors_gpios(int* number_of_sensors){
 
 	sensor_gpios_info_t* aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * hc_rs04_cont);
 	sensor_gpio_t *aux2;
-
-	pthread_mutex_lock(&mutex_hc_rs04);
 
 	for(int i = 0; i < hc_rs04_cont; i++){
 
@@ -568,12 +586,18 @@ sensor_gpios_info_t* hc_rs04_get_sensors_gpios(int* number_of_sensors){
 
 sensor_additional_parameters_info_t* hc_rs04_get_sensors_additional_parameters(int* number_of_sensors){
 
+	*number_of_sensors = 0;
+
 	if(!g_hc_rs04_initialized){
 		ESP_LOGE(TAG, "Error, you can't operate with the HC-RS04 without initializing it");
 		return NULL;
 	}
 
+	pthread_mutex_lock(&mutex_hc_rs04);
+
 	if(hc_rs04_cont == 0){
+		pthread_mutex_unlock(&mutex_hc_rs04);
+
 		ESP_LOGI(TAG, "There is no sensors of this type");
 		return NULL;
 	}
@@ -582,8 +606,6 @@ sensor_additional_parameters_info_t* hc_rs04_get_sensors_additional_parameters(i
 
 	sensor_additional_parameters_info_t* aux = (sensor_additional_parameters_info_t*) malloc(sizeof(sensor_additional_parameters_info_t) * hc_rs04_cont);
 	sensor_additional_parameter_t *aux2;
-
-	pthread_mutex_lock(&mutex_hc_rs04);
 
 	for(int i = 0; i < hc_rs04_cont; i++){
 
