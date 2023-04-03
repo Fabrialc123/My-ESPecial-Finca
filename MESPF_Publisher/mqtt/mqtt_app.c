@@ -35,6 +35,7 @@
 #include "mqtt_client.h"
 
 #include <pthread.h>
+#include "cjson.h"
 
 #include <mqtt/mqtt_topics.h>
 #include <mqtt/mqtt_commands.h>
@@ -47,7 +48,7 @@
 
 static const char TAG[] = "MQTT_APP";
 
-char *MQTT_APP_PERSONAL_NAME;
+char MQTT_APP_PERSONAL_NAME[MQTT_APP_MAX_TOPIC_LENGTH] = "N/A";
 
 #define nvs_MQTT_APP_HOST_key	"mqtt_host"
 static char nvs_MQTT_APP_HOST[32] = "";
@@ -72,7 +73,8 @@ static TaskHandle_t MQTT_APP_TASK_HANDLE_DATA_SENDER;
 static void set_personal_topic_name(void){
 	//char aux[32];
     uint8_t mac[6];
-    MQTT_APP_PERSONAL_NAME = calloc(1, MQTT_APP_MAX_TOPIC_LENGTH);
+    //MQTT_APP_PERSONAL_NAME = calloc(1, MQTT_APP_MAX_TOPIC_LENGTH);
+    memset(MQTT_APP_PERSONAL_NAME,0,MQTT_APP_MAX_TOPIC_LENGTH);
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     sprintf(MQTT_APP_PERSONAL_NAME, "ESP32_%02x%02X%02X", mac[3], mac[4], mac[5]);
 
@@ -80,8 +82,25 @@ static void set_personal_topic_name(void){
 
 void mqtt_app_format_data(char *src){
 	char timestamp[20];
-	char aux[MQTT_APP_MAX_DATA_LENGTH];
+	char aux[MQTT_APP_MAX_DATA_LENGTH], *printAux;
+	struct cJSON *jobj, *dt;
 	status_getDateTime(timestamp);
+
+	strcpy(aux, src);
+
+	jobj = cJSON_CreateObject();
+	dt = cJSON_Parse(aux);
+	cJSON_AddItemToObject(jobj,"DT",dt);
+	cJSON_AddStringToObject(jobj,"TS",timestamp);
+
+	printAux = cJSON_Print(jobj);
+
+	strcpy(src,printAux);
+
+	cJSON_Delete(dt);
+	free(printAux);
+
+	/*
 	strcpy(aux, "{\"DT\":");
 	strcat(aux,src);
 	strcat(aux,",\"TS\":\"");
@@ -89,6 +108,7 @@ void mqtt_app_format_data(char *src){
 	strcat(aux,"\"}");
 
 	strcpy(src,aux);
+	*/
 
 }
 
@@ -121,7 +141,7 @@ static void mqtt_app_disconnect(void){
 
 	vQueueDelete(mqtt_app_queue_handle);
 
-	free(MQTT_APP_PERSONAL_NAME);
+	//free(MQTT_APP_PERSONAL_NAME);
 
 	vTaskDelete(MQTT_APP_TASK_HANDLE_DATA_SENDER);
 	vTaskDelete(MQTT_APP_TASK_HANDLE_TASK);
