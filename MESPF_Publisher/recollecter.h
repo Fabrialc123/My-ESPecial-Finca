@@ -85,7 +85,8 @@ void get_sensors_gpios_json(char *data);
 void get_sensors_parameters_json(char *data);
 void get_sensors_alerts_json(char *data);
 
-int get_sensor_data_json (int sensor_id, int pos, char *data, char *sensorName);
+//int get_sensor_data_json (int sensor_id, int pos, char *data, char *sensorName);
+int get_sensor_data_cjson (int sensor_id, int pos, char *data, char *sensorName);
 
 //void get_sensor_data_name(int sensor_id, char *name);
 

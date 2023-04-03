@@ -7,6 +7,7 @@
 
 #include "esp_log.h"
 #include "string.h"
+#include "cjson.h"
 
 #include "recollecter.h"
 #include <pthread.h>
@@ -476,7 +477,7 @@ void get_sensors_alerts_json(char *data){
 
 		sensor_data = get_sensor_data(i, &number_of_sensors);
 
-		if(sensor_data != NULL && strcmp(sensor_data[i].sensorName, "STATUS") != 0){
+		if(sensor_data != NULL){
 
 			if(!first){
 				strcat(data, ",");
@@ -568,6 +569,48 @@ void get_sensors_alerts_json(char *data){
 	strcat(data, "}");
 }
 
+int get_sensor_data_cjson (int sensor_id, int pos, char* data, char* sensorName){
+	char aux[CHAR_LENGTH], *printAux;
+	sensor_data_t* all;
+	sensor_data_t sensor_data;
+	int i;
+	int number_of_sensors;
+	struct cJSON *jobj;
+
+	all = get_sensor_data(sensor_id, &number_of_sensors);
+
+	if (all == NULL) return -1;
+
+	if(pos < 0 || pos >= number_of_sensors) return -1;
+
+	sensor_data = all[pos];
+
+	strcpy(sensorName, sensor_data.sensorName);
+
+	jobj = cJSON_CreateObject();
+
+	for(i = 0;i < sensor_data.valuesLen;i++){
+		memset(&aux,0,CHAR_LENGTH);
+		itoa(i+1,aux,10);
+		if (sensor_data.sensor_values[i].sensor_value_type == INTEGER){
+			cJSON_AddNumberToObject(jobj,aux,sensor_data.sensor_values[i].sensor_value.ival);
+		}else if (sensor_data.sensor_values[i].sensor_value_type == FLOAT){
+			cJSON_AddNumberToObject(jobj,aux,sensor_data.sensor_values[i].sensor_value.fval);
+		}else {
+			cJSON_AddStringToObject(jobj,aux,sensor_data.sensor_values[i].sensor_value.cval);
+		}
+	}
+
+
+	printAux = cJSON_Print(jobj);
+
+	strcpy(data,printAux);
+
+	free(printAux);
+
+	return strlen(data);
+}
+
 int get_sensor_data_json (int sensor_id, int pos, char* data, char* sensorName){
 	char aux[CHAR_LENGTH];
 	sensor_data_t* all;
@@ -614,6 +657,7 @@ int get_sensor_data_json (int sensor_id, int pos, char* data, char* sensorName){
 	len = strlen(data);
 
 	free(all);
+
 	return len;
 }
 /*
