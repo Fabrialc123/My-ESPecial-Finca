@@ -1,0 +1,164 @@
+Se ha mejorado la funcionalidad del SET_COMMAND
+Este comando se utiliza enviando un mensaje en formato JSON por MQTT al siguiente tópico:
+
+MESPF/SENS/ESP32_X/Y/Z/CMD/SET
+
+Siendo:
+- ESP32_X : ESP32 que se quiere modificar
+- Y: Tipo de sensor a modificar
+- X: Unidad de sensor a modificar
+
+El mensaje en JSON tendrá la siguiente estructura:
+{
+"USER": MESPF_USER, 
+"ID": X,
+"OPT": Y,
+"ARG1": "123",
+"ARG2": "456",
+"ARG3": "789",
+"ARG4": "012",
+"ARG5": "345"
+}
+
+Siendo:
+- USER: Usuario que realiza la acción, al acabar el proceso el MESP publicará en MESP/USR/MESPF_USER/RESP el resultado de la operación
+- ID: Identificador del mensaje (INT), corre a cargo del cliente enviar un ID por el cuál sabrá qué comando se referirá el ESP al publicar en RESP
+- OPT: Operación a realizar (INT), se explicará a continuación qué operaciones están disponibles
+- ARGX: Parámetros que se utilizarán segúnla operación a realizar, SIEMPRE SON STRING
+NOTA: Aunque no todos los ARG se utilicen para todas las operaciones, es imprescindible que siempre se envíen , aunque sea rellenados con "0".
+
+NOTA: Este comando NO crea ni elimina sensores, simplemente los modifica.
+
+Actualmente se han implementado 3 tipos de operaciones:
+
+OPERACIÓN 0: Cambio de los valores de la alarma.
+  
+  Con esta operación se cambiarán los umbrales de alarma de cada valor del sensor, llamados UPPER_THRESHOLD y LOWER_THRESHOLD, así también como activar o desactivar la alarma,
+  y/o  los ticks. Los ARG tendrán que ser del tipo:
+  
+  ARG1: Valor de la alarma a cambiar, por ejemplo para el MQ2 que solo tiene un valor, sólo se rellenaría "0". En cambio, si se quiere cambiar el umbral para el segundo
+  valor del DHT22 , que es el de la Temperatura deberá de ser "1", si se quiere cambiar la Humedad deberá de ser "0".
+
+  ARG2: Se indicará con "1" que se quiere activar la alarma, y con "0" que se desactiva.
+
+  ARG3: Ticks de la alarma.
+
+  ARG4: Umbral superior de la alarma (UPPER_THRESHOLD), dependerá del tipo de valor que use el sensor
+
+  ARG5: Umbral superior de la alarma (LOWER_THRESHOLD)
+
+Ejemplo 1 de llamada: Para el MQ2, activar la alarma del único valor que tiene (que es un FLOAT) para que suene la alarma en caso de que se sobrepase el 60%
+Tópico: MESPF/SENS/ESP32_X/MQ2/1/CMD/SET
+Mensaje:
+{
+"USER": MESPF_USER, 
+"ID": 34,
+"OPT": 0,
+"ARG1": "0",
+"ARG2": "1",
+"ARG3": "10",
+"ARG4": "60.0",
+"ARG5": "0.0"
+}
+
+Ejemplo 2 de llamada: Para el DHT22, activar la alarma del segundo valor (Temperatura, FLOAT) para que suene la alarm en caso de que sea muy baja o muy alta:
+Tópico: MESPF/SENS/ESP32_X/DHT22/1/CMD/SET
+Mensaje:
+{
+"USER": MESPF_USER, 
+"ID": 35,
+"OPT": 0,
+"ARG1": "1",
+"ARG2": "1",
+"ARG3": "10",
+"ARG4": "50.2",
+"ARG5": "-10.5"
+}
+
+NOTA: Actualmente los umbrales de alarma son comunes a todos los sensores del mismo tipo, por lo que no importa si se publica el mensaje en:
+MESPF/SENS/ESP32_X/DHT22/1/CMD/SET o en MESPF/SENS/ESP32_X/DHT22/123/CMD/SET, que lo cambiará para todos los DHT22
+
+
+
+OPERACIÓN 1: Modificación de los GPIOS
+A través de esta operación se podrán modificar los GPIOS a los que está conectado cada sensor informando cada GPIO en los ARGs.
+Ejemplo 1 de llamada: Para el sensor MQ2 número 3, informar que el GPIO para el A0 (el único que tiene) es el 22
+Tópico: MESPF/SENS/ESP32_X/MQ2/3/CMD/SET
+Mensaje:
+{
+"USER": MESPF_USER, 
+"ID": 76,
+"OPT": 1,
+"ARG1": "22",
+"ARG2": "0",
+"ARG3": "0",
+"ARG4": "0",
+"ARG5": "0"
+}
+
+Ejemplo 2 de llamada: Para el HC-RS04 número 7, informar que los GPIOS a los que están conectados TRIG y ECHO son el 15 y el 16, respectivamente:
+Tópico: MESPF/SENS/ESP32_X/HC-RS04/7/CMD/SET
+Mensaje:
+{
+"USER": MESPF_USER, 
+"ID": 98,
+"OPT": 1,
+"ARG1": "15",
+"ARG2": "16",
+"ARG3": "0",
+"ARG4": "0",
+"ARG5": "0"
+}
+
+
+OPERACIÓN 2: Modificación de los parámetros
+
+Actualmente solo el sensor HC-RS04 utiliza dos parámetros para calcular la altura máxima del agua y la profundidad del tanque, 
+por lo que solo se usan ARG1 y ARG2 respectivamente. Aunque se abre la posibilidad de que si en un futuro se utilice un sensor que utilice más o menos parámetros, se
+rellenarían con los ARGs restantes.
+
+Ejemplo de llamada: Informar para el HC-RS04 número 5, que la distancia entre el sensor y el tanque es de 30 cm, mientras que el tanque tiene una profundidad de 200 cm:
+Tópico: MESPF/SENS/ESP32_X/HC-RS04/5/CMD/SET
+Mensaje:
+{
+"USER": MESPF_USER, 
+"ID": 12,
+"OPT": 2,
+"ARG1": "30",
+"ARG2": "200",
+"ARG3": "0",
+"ARG4": "0",
+"ARG5": "0"
+}
+
+
+
+
+Siempre y cuando se rellenen correcamente los campos "USER" y "ID", el ESP32 publicará en el tópico personal del usuario el resultado de la operación del siguiente modo:
+Tópico: MESP/USR/X/RESP
+Siendo X el usuario que se haya rellenado en "USER"
+Estructura del mensaje que se recibirá (JSON):
+{
+  "ID" : Y,
+  "RES": Z
+}
+
+Siendo Y el ID enviado en el campo "ID" del comando, y Z el código del resultado, el cuál podrá ser uno de los siguientes valores:
+- 1: EL proceso ha terminado correctamente
+- -100: El campo "OPT" no se ha definido o no es un número.
+- -101: El campo "ARG1" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
+- -102: El campo "ARG2" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
+- -103: El campo "ARG3" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
+- -104: El campo "ARG4" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
+- -105: El campo "ARG5" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
+- -106: No se ha encontrado el ID del Sensor, esto quiere decir que se ha intentado modificar un TIPO de sensor que no se ha instalado.
+- -107: No se ha encontrado el Sensor_data del Sensor, igual que lo anterior.
+- -108: No hay sensores instalados de ese tipo o se ha intentado modificar un número de sensor incorrecto. Por ejemplo si se intena modificar el DHT22 número 2
+cuando sólo hay 1 instalado.
+- -109 (OPT 0): Se ha intentado modificar un número de valor que no existe en el TIPO de sensor. Por ejemplo, intentar modificar el valor 3 del HC-RS04, cuando este solo
+tiene 1
+- -110 (OPT 2): No se ha encontrado una configuración de parámetros. Por ejemplo, si se intenta modificar algún parámetro del MQ2, cuando este tipo de sensor no usa parámetros
+- -404: Tipo de operación no disponible.
+- -1: Error genérico del driver del sensor
+
+
