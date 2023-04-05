@@ -354,7 +354,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 			}
 			else if (num_sensors == 0 || num_sensors <= sensor_unit || sensor_unit <= 0){
 				ESP_LOGE(TAG2, "mqtt_app_process_set_command, Invalid sensor_unit (%d) for sensor_id (%d)", sensor_unit,sensor_id);
-				resp = -111;
+				resp = -108;
 			}
 			else{
 				for(i = 0; i < sensor_parameters[0].parametersLen; i++){
