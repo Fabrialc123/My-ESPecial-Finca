@@ -10,8 +10,6 @@
 
 #include <stdbool.h>
 
-#define ORIGINAL_CONT 30
-
 /**
  * Initialize the GPIOS manager
  */
@@ -20,49 +18,22 @@ void gpios_manager_init(void);
 /**
  * Lock the GPIOS and remove them from the list
  *
- * return 1 if it is valid, -1 if not
+ * return 1 if done, -1 if not
  */
-int gpios_manager_lock(int* gpios, int size);
+int gpios_manager_lock_gpios(int* gpios, int size, char* reason);
 
 /**
  * Free the GPIOS and add them to the list
  *
- * return 1 if it is valid, -1 if not
+ * return 1 if done, -1 if not
  */
-int gpios_manager_free(int* gpios, int size);
-
-/**
- * Look if the GPIO is free or not
- *
- * return true if free, false if not
- */
-bool gpios_manager_is_free(int gpio);
-
-/**
- * Get the number of GPIOS available
- *
- * return cont
- */
-int gpios_manager_get_cont(void);
+int gpios_manager_free_gpios(int* gpios, int size, char* reason);
 
 /**
  * Get the GPIOS available
  *
- * return array with size "cont" filled with all GPIOS available
+ * return array with all free GPIOS, the size is given in parameter "number_of_gpios". Or NULL if something wrong happened
  */
-int* gpios_manager_get_availables(void);
-
-/**
- * Get the GPIOS available (JSON format)
- */
-void gpios_manager_json(char *data);
-
-/**
- * Check if GPIO is ADC1
- *
- * return true if it is, false if not
- */
-bool gpios_manager_check_adc1(int gpio);
-
+int* gpios_manager_get_gpios_availables(int* number_of_gpios);
 
 #endif /* MAIN_GPIOS_MANAGER_H_ */
