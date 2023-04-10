@@ -17,6 +17,7 @@
 static const char TAG[]  = "gpios";
 
 static const int original_gpios[] = {36,39,34,35,32,33,25,26,27,14,12,13,9,10,11,23,22,1,3,21,19,18,5,4,0,2,15,8,7,6};
+#define ORIGINAL_CONT 30
 
 bool g_gpios_initialized = false;
 
@@ -26,7 +27,18 @@ static int cont;
 static pthread_mutex_t mutex_gpios;
 
 /**
- * Check if a gpio is repeated (brute force)
+ * Check if one GPIO can be selected multiple times
+ */
+static bool check_multiple_times(int gpio){
+
+	if(gpio == 21 || gpio == 22) // I2C GPIOS
+		return true;
+	else
+		return false;
+}
+
+/**
+ * Check if GPIOS are repeated
  */
 static bool check_repeated(int* gpios, int size){
 	bool repeated = false;
@@ -48,46 +60,119 @@ static bool check_repeated(int* gpios, int size){
 }
 
 /**
- * Delete the gpios sent as parameter
+ * Check if GPIOS are original
  */
-static void delete_shifting(int* gpios, int size){
-	int index;
-	bool found;
+static bool check_originals(int* gpios, int size){
+	bool originals = true, found;
+	int i = 0, j;
+
+	while(i < size && originals){
+		found = false;
+		j = 0;
+
+		while(j < ORIGINAL_CONT && !found){
+			if(gpios[i] == original_gpios[j])
+				found = true;
+			else
+				j++;
+		}
+
+		if(!found)
+			originals = false;
+		else
+			i++;
+	}
+
+	return originals;
+}
+
+/**
+ * Check if all GPIOS are free
+ */
+static bool check_all_free(int* gpios, int size){
+	bool free = true, found;
+	int i = 0, j;
 
 	pthread_mutex_lock(&mutex_gpios);
 
-	for(int i = 0; i < size; i++){
-
-		index = 0;
+	while(i < size && free){
 		found = false;
+		j = 0;
 
-		// Search the index of the GPIO
-		while(index < cont && !found){
-			if(gpios_list[index] == gpios[i]){
+		while(j < cont && !found){
+			if(gpios[i] == gpios_list[j])
 				found = true;
-			}
-			else{
-				index++;
-			}
+			else
+				j++;
 		}
 
-		// Shift and delete the GPIO
-		for(int i = index; i < cont - 1; i++){
-			gpios_list[i] = gpios_list[i + 1];
-		}
-
-		// Shorten the list
-		cont--;
+		if(!found)
+			free = false;
+		else
+			i++;
 	}
 
 	pthread_mutex_unlock(&mutex_gpios);
+
+	return free;
+}
+
+/**
+ * Check if one of the GPIOS is free
+ */
+static bool check_one_free(int* gpios, int size){
+	bool free = false, found;
+	int i = 0, j;
+
+	pthread_mutex_lock(&mutex_gpios);
+
+	while(i < size && !free){
+		found = false;
+		j = 0;
+
+		if(!check_multiple_times(gpios[i])){
+			while(j < cont && !found){
+				if(gpios[i] == gpios_list[j])
+					found = true;
+				else
+					j++;
+			}
+		}
+
+		if(found)
+			free = true;
+		else
+			i++;
+	}
+
+	pthread_mutex_unlock(&mutex_gpios);
+
+	return free;
+}
+
+/**
+ * Get index of a GPIO
+ */
+static int get_index(int gpio){
+	int index = 0;
+	bool found = false;
+
+	while(index < cont && !found){
+		if(gpios_list[index] == gpio)
+			found = true;
+		else
+			index++;
+	}
+
+	return index;
 }
 
 void gpios_manager_init(void){
 
-	if(pthread_mutex_init(&mutex_gpios, NULL) != 0){
+	if(g_gpios_initialized == true)
+		ESP_LOGE(TAG, "GPIOS manager already initialized");
+	else if(pthread_mutex_init(&mutex_gpios, NULL) != 0)
 		ESP_LOGE(TAG, "Failed to initialize the GPIOS mutex");
-	}
 	else{
 
 		for(int i = 0; i < ORIGINAL_CONT; i++){
@@ -99,147 +184,112 @@ void gpios_manager_init(void){
 	}
 }
 
-int gpios_manager_lock(int* gpios, int size){
+int gpios_manager_lock_gpios(int* gpios, int size, char* reason){
 
-	int i = 0;
-	int res = 1;
+	if(g_gpios_initialized == false){
+		ESP_LOGE(TAG, "GPIOS manager not initialized");
+		sprintf(reason, "GPIOS manager not initialized");
 
-	// Look if gpios are not repeated
+		return -1;
+	}
+
 	if(check_repeated(gpios, size)){
-		ESP_LOGE(TAG, "you can't pick the same gpios multiple times");
-		res = -1;
+		ESP_LOGE(TAG, "Same GPIOS multiple times");
+		sprintf(reason, "Same GPIOS multiple times");
+
+		return -1;
 	}
 
-	// Look if all GPIOS passed are available
-	while(i < size && res == 1){
-		if(!gpios_manager_is_free(gpios[i])){
-			ESP_LOGE(TAG, "gpios passed are not available!");
-			res = -1;
-		}
-		i++;
+	if(!check_all_free(gpios, size)){
+		ESP_LOGE(TAG, "Some GPIO is not free");
+		sprintf(reason, "Some GPIO is not free");
+
+		return -1;
 	}
-
-	// In case they are, delete them from the array
-	if(res == 1){
-		delete_shifting(gpios, size);
-	}
-
-	return res;
-}
-
-
-int gpios_manager_free(int* gpios, int size){
-
-	int i;
-	int res = 1;
-	bool found[size];
-
-	// Look if gpios are not repeated
-	if(check_repeated(gpios, size)){
-		ESP_LOGE(TAG, "you can't pick the same gpios multiple times");
-		res = -1;
-	}
-	else{
-
-		// Initialize found array
-		for(i = 0; i < size; i++){
-			found[i] = false;
-		}
-
-		// Look if the gpios passed were originally a possibility
-		for(int g = 0; g < size; g++){
-			i = 0;
-			while(i < ORIGINAL_CONT && !found[g]){
-				if(gpios[g] == original_gpios[i]){
-					found[g] = true;
-				}
-				else{
-					i++;
-				}
-			}
-		}
-
-		// Check if all are true
-		i = 0;
-
-		while(i < size && found[i] == true){
-			i++;
-		}
-
-		if(i < size){
-			ESP_LOGE(TAG, "gpios passed couldn't be an option!");
-			res = -1;
-		}
-		else{
-			i = 0;
-
-			// Look if all GPIOS passed are not available
-			while(i < size && res == 1){
-				if(gpios_manager_is_free(gpios[i])){
-					ESP_LOGE(TAG, "gpios passed are available!");
-					res = -1;
-				}
-				i++;
-			}
-
-			pthread_mutex_lock(&mutex_gpios);
-
-			// In case they are not, add them to the array
-			if(res == 1){
-				for(i = 0; i < size; i++){
-					gpios_list[cont] = gpios[i];
-					cont++;
-				}
-			}
-
-			pthread_mutex_unlock(&mutex_gpios);
-		}
-	}
-
-	return res;
-}
-
-
-bool gpios_manager_is_free(int gpio){
-
-	int i = 0;
-	bool found = false;
 
 	pthread_mutex_lock(&mutex_gpios);
 
-	while(i < cont && !found){
+	int index;
 
-		if(gpio == gpios_list[i]){
-			found = true;
-		}
-		else{
-			i++;
+	for(int i = 0; i < size; i++){
+
+		if(!check_multiple_times(gpios[i])){
+			index = get_index(gpios[i]);
+
+			for(int j = index; j < cont - 1; j++){
+				gpios_list[j] = gpios_list[j + 1];
+			}
+
+			cont--;
 		}
 	}
 
 	pthread_mutex_unlock(&mutex_gpios);
 
-	return found;
+	return 1;
 }
 
-int gpios_manager_get_cont(void){
-	int size = 0;
+
+int gpios_manager_free_gpios(int* gpios, int size, char* reason){
+
+	if(g_gpios_initialized == false){
+		ESP_LOGE(TAG, "GPIOS manager not initialized");
+		sprintf(reason, "GPIOS manager not initialized");
+
+		return -1;
+	}
+
+	if(check_repeated(gpios, size)){
+		ESP_LOGE(TAG, "Same GPIOS multiple times");
+		sprintf(reason, "Same GPIOS multiple times");
+
+		return -1;
+	}
+
+	if(!check_originals(gpios, size)){
+		ESP_LOGE(TAG, "Some GPIO is not original");
+		sprintf(reason, "Some GPIO is not original");
+
+		return -1;
+	}
+
+	if(check_one_free(gpios, size)){
+		ESP_LOGE(TAG, "Some GPIO is already free");
+		sprintf(reason, "Some GPIO is already free");
+
+		return -1;
+	}
 
 	pthread_mutex_lock(&mutex_gpios);
 
-	size = cont;
+	for(int i = 0; i < size; i++){
+		if(!check_multiple_times(gpios[i])){
+			gpios_list[cont] = gpios[i];
+			cont++;
+		}
+	}
 
 	pthread_mutex_unlock(&mutex_gpios);
 
-	return size;
+	return 1;
 }
 
-int* gpios_manager_get_availables(void){
+int* gpios_manager_get_gpios_availables(int* number_of_gpios){
+
+	*number_of_gpios = 0;
+
+	if(g_gpios_initialized == false){
+		ESP_LOGE(TAG, "GPIOS manager not initialized");
+
+		return NULL;
+	}
+
+	pthread_mutex_lock(&mutex_gpios);
+
 	int* gpios;
-
 	gpios = (int*) malloc(sizeof(int) * cont);
 
-	pthread_mutex_lock(&mutex_gpios);
+	*number_of_gpios = cont;
 
 	for(int i = 0; i < cont; i++){
 		gpios[i] = gpios_list[i];
@@ -248,40 +298,4 @@ int* gpios_manager_get_availables(void){
 	pthread_mutex_unlock(&mutex_gpios);
 
 	return gpios;
-}
-
-void gpios_manager_json(char *data){
-
-	char aux[CHAR_LENGTH];
-
-	int numOfGpiosAvailables = cont;
-	int* gpiosAvailables = gpios_manager_get_availables();
-
-	strcat(data, "{\"numberOfGpiosAvailables\":");
-	memset(&aux, 0, CHAR_LENGTH);
-	sprintf(aux, "%d", numOfGpiosAvailables);
-	strcat(data, aux);
-
-	strcat(data, ", \"gpios\":[");
-
-	for(int i = 0; i < numOfGpiosAvailables; i++){
-
-		if(i > 0)
-			strcat(data, ",");
-
-		memset(&aux, 0, CHAR_LENGTH);
-		sprintf(aux, "%d", gpiosAvailables[i]);
-		strcat(data, aux);
-	}
-
-	strcat(data, "]}");
-}
-
-bool gpios_manager_check_adc1(int gpio){
-	switch (gpio) {
-		case 36: case 37: case 38: case 39: case 32: case 33: case 34: case 35:
-			return true;
-		default:
-			return false;
-	}
 }
