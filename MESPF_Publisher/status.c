@@ -281,9 +281,11 @@ sensor_data_t* status_recollecter (int* number_of_sensors){
 }
 
 sensor_gpios_info_t* status_gpios_recollecter (int* number_of_sensors){
+	*number_of_sensors = 0;
 	return NULL;
 }
 
 sensor_additional_parameters_info_t* status_parameters_recollecter (int* number_of_sensors){
+	*number_of_sensors = 0;
 	return NULL;
 }
