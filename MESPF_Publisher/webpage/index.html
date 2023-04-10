@@ -28,7 +28,7 @@
 		</div>
 	</header>
 
-	<div id="sensor_0" data-sensor_name="STATUS" data-sensor_n_units="1" data-sensor_n_values="4" data-sensor_n_gpios="0" data-sensor_n_parameters="0" class="information_box" style="display: block;">
+	<div id="sensor_0" data-sensor_name="STATUS" data-sensor_n_units="1" data-sensor_n_values="4" data-sensor_n_gpios="null" data-sensor_gpios_names="" data-sensor_n_parameters="null" data-sensor_parameters_names="" data-sensor_parameters_types="" class="information_box" style="display: block;">
 		<h2 id="esp_ip">IP: <span id="sensor_0_unit_0_value_0_span"></span></h2>
 		<hr>
 		<h2 id="esp_id">ID: <span id="sensor_0_unit_0_value_1_span"></span></h2>
@@ -109,11 +109,7 @@
 		<div id="sensor_deployment">
 			<div id="sensor_deployment_header">
 				<h3>Add sensor:</h3>
-				<div class="buttons">
-					<input type="button" value="Add MQ2" onclick="deploySensorForm(0)" />
-					<input type="button" value="Add DHT22" onclick="deploySensorForm(1)" />
-					<input type="button" value="Add HC-RS04" onclick="deploySensorForm(2)" />
-					<input type="button" value="Add SO-SEN" onclick="deploySensorForm(3)" />
+				<div id="add_sensors_buttons" class="buttons">
 				</div>
 			</div>
 			<div id="sensor_deployment_body">
