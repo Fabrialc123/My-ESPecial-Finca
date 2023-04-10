@@ -350,15 +350,15 @@ static esp_err_t SensorsConfiguration_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsConfiguration requested");
 
-	char sensorsJSON[4096];
-	memset(&sensorsJSON, 0, 4096);
+	char sensorsConfigurationJSON[4096];
+	memset(&sensorsConfigurationJSON, 0, 4096);
 
-	get_sensors_json(sensorsJSON);
+	get_sensors_configuration_cjson(sensorsConfigurationJSON);
 
 	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
 
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
-	httpd_resp_send(req, sensorsJSON, strlen(sensorsJSON));
+	httpd_resp_send(req, sensorsConfigurationJSON, strlen(sensorsConfigurationJSON));
 
 	return ESP_OK;
 }
@@ -367,15 +367,15 @@ static esp_err_t SensorsValues_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsValues requested");
 
-	char sensorsJSON[4096];
-	memset(&sensorsJSON, 0, 4096);
+	char sensorsValuesJSON[4096];
+	memset(&sensorsValuesJSON, 0, 4096);
 
-	get_sensors_values_json(sensorsJSON);
+	get_sensors_values_cjson(sensorsValuesJSON);
 
 	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
 
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
-	httpd_resp_send(req, sensorsJSON, strlen(sensorsJSON));
+	httpd_resp_send(req, sensorsValuesJSON, strlen(sensorsValuesJSON));
 
 	return ESP_OK;
 }
@@ -384,15 +384,15 @@ static esp_err_t SensorsGpios_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsGpios requested");
 
-	char sensorsJSON[4096];
-	memset(&sensorsJSON, 0, 4096);
+	char sensorsGpiosJSON[4096];
+	memset(&sensorsGpiosJSON, 0, 4096);
 
-	get_sensors_gpios_json(sensorsJSON);
+	get_sensors_gpios_cjson(sensorsGpiosJSON);
 
 	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
 
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
-	httpd_resp_send(req, sensorsJSON, strlen(sensorsJSON));
+	httpd_resp_send(req, sensorsGpiosJSON, strlen(sensorsGpiosJSON));
 
 	return ESP_OK;
 }
@@ -401,15 +401,15 @@ static esp_err_t SensorsParameters_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsParameters requested");
 
-	char sensorsJSON[4096];
-	memset(&sensorsJSON, 0, 4096);
+	char sensorsParametersJSON[4096];
+	memset(&sensorsParametersJSON, 0, 4096);
 
-	get_sensors_parameters_json(sensorsJSON);
+	get_sensors_parameters_cjson(sensorsParametersJSON);
 
 	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
 
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
-	httpd_resp_send(req, sensorsJSON, strlen(sensorsJSON));
+	httpd_resp_send(req, sensorsParametersJSON, strlen(sensorsParametersJSON));
 
 	return ESP_OK;
 }
@@ -418,15 +418,15 @@ static esp_err_t SensorsAlerts_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsAlerts requested");
 
-	char sensorsJSON[4096];
-	memset(&sensorsJSON, 0, 4096);
+	char sensorsAlertsJSON[4096];
+	memset(&sensorsAlertsJSON, 0, 4096);
 
-	get_sensors_alerts_json(sensorsJSON);
+	get_sensors_alerts_cjson(sensorsAlertsJSON);
 
 	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
 
 	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
-	httpd_resp_send(req, sensorsJSON, strlen(sensorsJSON));
+	httpd_resp_send(req, sensorsAlertsJSON, strlen(sensorsAlertsJSON));
 
 	return ESP_OK;
 }
@@ -435,10 +435,33 @@ static esp_err_t GetGpios_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "GetGpios requested");
 
+	char aux[CHAR_LENGTH];
 	char gpios[420];
 	memset(&gpios, 0, 420);
 
-	gpios_manager_json(gpios);
+	int numOfGpiosAvailables;
+	int* gpiosAvailables = gpios_manager_get_gpios_availables(&numOfGpiosAvailables);
+
+	strcat(gpios, "{\"numberOfGpiosAvailables\":");
+	memset(&aux, 0, CHAR_LENGTH);
+	sprintf(aux, "%d", numOfGpiosAvailables);
+	strcat(gpios, aux);
+
+	strcat(gpios, ", \"gpios\":[");
+
+	for(int i = 0; i < numOfGpiosAvailables; i++){
+
+		if(i > 0)
+			strcat(gpios, ",");
+
+		memset(&aux, 0, CHAR_LENGTH);
+		sprintf(aux, "%d", gpiosAvailables[i]);
+		strcat(gpios, aux);
+	}
+
+	strcat(gpios, "]}");
+
+	free(gpiosAvailables);
 
 	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
 
@@ -448,33 +471,9 @@ static esp_err_t GetGpios_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
-static esp_err_t SensorAddition_handler(httpd_req_t *req){
-	char buf[50], response[30];
-	int recv_len, type, res;
-
-	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
-
-	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
-	else {
-		type = atoi(strtok(buf,"\n"));
-
-		res = sensors_manager_init_sensor(type);
-
-		if(res == 1)
-			sprintf(response,"Sensor added");
-		else
-			sprintf(response,"Error, Sensor not added");
-	}
-
-	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
-	httpd_resp_send(req, response, strlen(response));
-
-	return ESP_OK;
-}
-
 static esp_err_t SensorUnitAddition_handler(httpd_req_t *req){
-	char buf[500], response[30], *parameter_type;
-	int recv_len, i, n_gpios, *gpios, n_parameters, res;
+	char buf[500], response[100], *parameter_type, reason[50];
+	int recv_len, i, n_gpios, *gpios, n_parameters;
 	union sensor_value_u *parameters;
 
 	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
@@ -506,12 +505,10 @@ static esp_err_t SensorUnitAddition_handler(httpd_req_t *req){
 
 		i =  atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_add_sensor_unit(i - 1, gpios, parameters);
-
-		if(res == 1)
+		if(sensors_manager_add_sensor_unit(i - 1, gpios, parameters, reason) == 1)
 			sprintf(response,"Sensor unit added");
 		else
-			sprintf(response,"Error, Sensor unit not added");
+			sprintf(response,"Error, Sensor unit not added.\nReason: %s", reason);
 
 		free(gpios);
 		free(parameters);
@@ -523,34 +520,9 @@ static esp_err_t SensorUnitAddition_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
-static esp_err_t SensorDeletion_handler(httpd_req_t *req){
-
-	char buf[50], response[30];
-	int recv_len, i, res;
-
-	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
-
-	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
-	else {
-		i = atoi(strtok(buf,"\n"));
-
-		res = sensors_manager_destroy_sensor(i - 1);
-
-		if(res == 1)
-			sprintf(response,"Sensor deleted");
-		else
-			sprintf(response,"Error, sensor not deleted");
-	}
-
-	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
-	httpd_resp_send(req, response, strlen(response));
-
-	return ESP_OK;
-}
-
 static esp_err_t SensorUnitDeletion_handler(httpd_req_t *req){
-	char buf[50], response[30];
-	int recv_len, i, j, res;
+	char buf[50], response[100], reason[50];
+	int recv_len, i, j;
 
 	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
 
@@ -559,12 +531,10 @@ static esp_err_t SensorUnitDeletion_handler(httpd_req_t *req){
 		i = atoi(strtok(buf,"\n"));
 		j = atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_delete_sensor_unit(i - 1,j);
-
-		if(res == 1)
+		if(sensors_manager_delete_sensor_unit(i - 1, j, reason) == 1)
 			sprintf(response,"Sensor unit deleted");
 		else
-			sprintf(response,"Error, unit not deleted");
+			sprintf(response,"Error, Sensor unit not deleted.\nReason: %s", reason);
 	}
 
 	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
@@ -574,8 +544,8 @@ static esp_err_t SensorUnitDeletion_handler(httpd_req_t *req){
 }
 
 static esp_err_t SensorEditGpios_handler(httpd_req_t *req){
-	char buf[500], response[30];
-	int recv_len, i, j, n_gpios, *gpios, res;
+	char buf[500], response[100], reason[50];
+	int recv_len, i, j, n_gpios, *gpios;
 
 	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
 
@@ -593,12 +563,10 @@ static esp_err_t SensorEditGpios_handler(httpd_req_t *req){
 
 		j =  atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_set_gpios(i - 1, j, gpios);
-
-		if(res == 1)
+		if(sensors_manager_set_gpios(i - 1, j, gpios, reason) == 1)
 			sprintf(response,"GPIOS changed");
 		else
-			sprintf(response,"Error, GPIOS not changed");
+			sprintf(response,"Error, GPIOS not changed.\nReason: %s", reason);
 
 		free(gpios);
 	}
@@ -610,8 +578,8 @@ static esp_err_t SensorEditGpios_handler(httpd_req_t *req){
 }
 
 static esp_err_t SensorEditParameters_handler(httpd_req_t *req){
-	char buf[500], response[30], *parameter_type;
-	int recv_len, i, j, n_parameters, res;
+	char buf[500], response[100], *parameter_type, reason[50];
+	int recv_len, i, j, n_parameters;
 	union sensor_value_u *parameters;
 
 	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
@@ -637,12 +605,10 @@ static esp_err_t SensorEditParameters_handler(httpd_req_t *req){
 
 		j =  atoi(strtok(NULL,"\n"));
 
-		res = sensors_manager_set_parameters(i - 1, j, parameters);
-
-		if(res == 1)
+		if(sensors_manager_set_parameters(i - 1, j, parameters, reason) == 1)
 			sprintf(response,"Parameters changed");
 		else
-			sprintf(response,"Error, Parameters not changed");
+			sprintf(response,"Error, Parameters not changed.\nReason: %s", reason);
 
 		free(parameters);
 	}
@@ -654,8 +620,8 @@ static esp_err_t SensorEditParameters_handler(httpd_req_t *req){
 }
 
 static esp_err_t SensorEditAlerts_handler(httpd_req_t *req){
-	char buf[500], response[30], *Selected_alert, *threshold_type;
-	int recv_len, i, value, ticks, res;
+	char buf[500], response[100], *Selected_alert, *threshold_type, reason[50];
+	int recv_len, i, value, ticks;
 	bool alert;
 	union sensor_value_u upperThreshold, lowerThreshold;
 
@@ -691,58 +657,10 @@ static esp_err_t SensorEditAlerts_handler(httpd_req_t *req){
 			strcpy(lowerThreshold.cval, strtok(NULL,"\n"));
 		}
 
-		res = sensors_manager_set_alert_values(i - 1, value, alert, ticks, upperThreshold, lowerThreshold);
-
-		if(res == 1)
+		if(sensors_manager_set_alert_values(i - 1, value, alert, ticks, upperThreshold, lowerThreshold, reason) == 1)
 			sprintf(response,"Alert changed");
 		else
-			sprintf(response,"Error, Alert not changed");
-	}
-
-	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
-	httpd_resp_send(req, response, strlen(response));
-
-	return ESP_OK;
-}
-
-static esp_err_t ValidateInfo_handler(httpd_req_t *req){
-	char buf[500], response[30], *parameter_type;
-	int recv_len, type, n_gpios, *gpios, n_parameters, res;
-	union sensor_value_u *parameters;
-
-	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
-
-	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
-	else {
-		n_gpios = atoi(strtok(buf,"\n"));
-
-		gpios = (int*) malloc(sizeof(int) * n_gpios);
-
-		for(int i = 0; i < n_gpios; i++){
-			gpios[i] = atoi(strtok(NULL,"\n"));
-		}
-
-		n_parameters = atoi(strtok(NULL,"\n"));
-
-		parameters = (union sensor_value_u*) malloc(sizeof(union sensor_value_u) * n_parameters);
-
-		for(int i = 0; i < n_parameters; i++){
-			parameter_type = strtok(NULL,"\n");
-
-			if(strcmp(parameter_type, "INTEGER") == 0)
-				parameters[i].ival = atoi(strtok(NULL,"\n"));
-			else if(strcmp(parameter_type, "FLOAT") == 0)
-				parameters[i].fval = atof(strtok(NULL,"\n"));
-			else
-				strcpy(parameters[i].cval, strtok(NULL,"\n"));
-		}
-
-		type =  atoi(strtok(NULL,"\n"));
-
-		sensors_manager_validate_info(type, gpios, parameters, response);
-
-		free(gpios);
-		free(parameters);
+			sprintf(response,"Error, Alert not changed.\nReason: %s", reason);
 	}
 
 	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
@@ -913,14 +831,6 @@ static httpd_handle_t http_server_configure(void){
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &GetGpios));
 
-	    httpd_uri_t SensorAddition = {
-			.uri = "/SensorAddition",
-			.method = HTTP_POST,
-			.handler = SensorAddition_handler,
-			.user_ctx = NULL
-	    };
-	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorAddition));
-
 	    httpd_uri_t SensorUnitAddition = {
 			.uri = "/SensorUnitAddition",
 			.method = HTTP_POST,
@@ -928,14 +838,6 @@ static httpd_handle_t http_server_configure(void){
 			.user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorUnitAddition));
-
-	    httpd_uri_t SensorDeletion = {
-			.uri = "/SensorDeletion",
-			.method = HTTP_POST,
-			.handler = SensorDeletion_handler,
-			.user_ctx = NULL
-	    };
-	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorDeletion));
 
 	    httpd_uri_t SensorUnitDeletion = {
 			.uri = "/SensorUnitDeletion",
@@ -968,14 +870,6 @@ static httpd_handle_t http_server_configure(void){
 			.user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorEditAlerts));
-
-	    httpd_uri_t ValidateInfo = {
-			.uri = "/ValidateInfo",
-			.method = HTTP_POST,
-			.handler = ValidateInfo_handler,
-			.user_ctx = NULL
-	    };
-	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &ValidateInfo));
 
 		return http_server_handle;
 	}
