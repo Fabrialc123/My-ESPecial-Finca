@@ -48,17 +48,22 @@
 
 // ------------------------------------------------- Sensor information --------------------------------------------------------------
 
-// Defines
+// Important defines
 
 #define DHT22_N_GPIOS						1
-
 #define DHT22_N_VALUES						2
-
 #define DHT22_N_ADDITIONAL_PARAMS			0
 
-#define DHT22_MAX_DATA 						5
-
 #define DHT22_TIME_TO_UPDATE_DATA			500 // 100 = 1 second
+
+// LCD related defines (1 for each value)
+
+#define DHT22_SHOW_HUMIDITY_ON_LCD			true
+#define DHT22_SHOW_TEMPERATURE_ON_LCD		true
+
+// Additional Defines
+
+#define DHT22_MAX_DATA 						5
 
 // Structure for sensor GPIOS
 
@@ -73,42 +78,40 @@ typedef struct {
 	float temperature;
 } dht22_data_t;
 
-// Values related to the LCD
+// Structure for sensor alerts
 
-#define DHT22_SHOW_HUMIDITY_ON_LCD			true
+typedef struct {
+	bool humidity_alert;
+	int humidity_ticks_to_alert;
+	float humidity_upper_threshold;
+	float humidity_lower_threshold;
 
-#define DHT22_SHOW_TEMPERATURE_ON_LCD		true
+	bool temperature_alert;
+	int temperature_ticks_to_alert;
+	float temperature_upper_threshold;
+	float temperature_lower_threshold;
+} dht22_alerts_t;
 
 // --------------------------------------------------- Sensor management -----------------------------------------------------------
-
-/*
- * Startup DHT22 with the information previously saved (NVS)
- */
-void dht22_startup(void);
 
 /*
  * Initializes DTH22 peripheral
  */
 void dht22_init(void);
 
-/*
- * Disables DTH22 peripheral
- */
-void dht22_destroy(void);
-
 /**
  * Add a new DHT22 sensor
  *
  * NOTE: return 1 when it happens successfully, -1 in other cases
  */
-int dht22_add_sensor(int* gpios, union sensor_value_u* parameters);
+int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason);
 
 /**
  * Delete a DHT22 sensor
  *
  * Note: return 1 when it happens successfully, -1 in other cases
  */
-int dht22_delete_sensor(int pos);
+int dht22_delete_sensor(int pos, char* reason);
 
 // ------------------------------------------------------- Sets --------------------------------------------------------------------
 
@@ -117,21 +120,21 @@ int dht22_delete_sensor(int pos);
  *
  * Note: return 1 when it happens successfully, -1 in other cases
  */
-int dht22_set_gpios(int pos, int* gpios);
+int dht22_set_gpios(int pos, int* gpios, char* reason);
 
 /**
  * Change Parameters of a sensor
  *
  * Note: return 1  when it happens successfully, -1 in other cases
  */
-int dht22_set_parameters(int pos, union sensor_value_u* parameters);
+int dht22_set_parameters(int pos, union sensor_value_u* parameters, char* reason);
 
 /**
  * Change the alert values
  *
  * Note: return 1 when it happens successfully, -1 in other cases
  */
-int dht22_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold);
+int dht22_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold, char* reason);
 
 // ------------------------------------------------------- Gets --------------------------------------------------------------------
 
@@ -152,7 +155,7 @@ sensor_gpios_info_t* dht22_get_sensors_gpios(int* number_of_sensors);
 /**
  * Gets additional parameters of all sensors of this type
  *
- * Note: in case of error (or it is a sensor with no additional parameters), return NULL pointer
+ * Note: in case of error, return NULL pointer
  */
 sensor_additional_parameters_info_t* dht22_get_sensors_additional_parameters(int* number_of_sensors);
 
