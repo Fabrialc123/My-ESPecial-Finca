@@ -19,7 +19,8 @@ $(document).ready(function(){
 	
 	initSensors();
 	
-	startSensorsValuesUpdateInterval();
+	setTimeout(createAddButtons, 1000);
+	setTimeout(startSensorsValuesUpdateInterval, 1000);
 });
 
 function getConnectionsConfiguration()
@@ -179,10 +180,10 @@ function removeDiv(divID){
  */
 function initSensors(){
 	
-	// Get sensors already installed
+	// Get sensors installed
 	getSensorsConfiguration();
 			
-	// Fill the information
+	// Fill the information about them
 	setTimeout(sensorsValuesUpdate, 1000);
 	setTimeout(sensorsGpiosUpdate, 1000);
 	setTimeout(sensorsParametersUpdate, 1000);
@@ -193,13 +194,24 @@ function initSensors(){
 }
 
 /**
+ * Create all necessary buttons to install the different types of sensors
+ */
+function createAddButtons(){
+	
+	for(let i = 1; i < sensorsInstalled; i++){
+		if(document.getElementById("sensor_" + i).dataset.sensor_name != "null")
+			document.getElementById("add_sensors_buttons").innerHTML += '<input type="button" value="Add '+ document.getElementById("sensor_" + i).dataset.sensor_name +'" onclick="deploySensorForm('+ i +')" />';
+	}
+}
+
+/**
  * Get the Sensors already installed
  */
 function getSensorsConfiguration(){
 	
     $.getJSON('/SensorsConfiguration', function(data){
     	
-    	var name, nUnits, nValues, valuesNames, valuesTypes, nGpios, gpiosNames, nParameters, parametersNames, parametersTypes;
+    	var name, nUnits, nValues, valuesNames, valuesTypes, nGpios, gpiosNames, auxGpiosNames, nParameters, parametersNames, auxParametersNames, parametersTypes, auxParametersTypes;
     	
     	sensorsInstalled = data["nSensors"];
     	
@@ -216,8 +228,29 @@ function getSensorsConfiguration(){
     		parametersNames = data["sensors"][i].parameterNames;
     		parametersTypes = data["sensors"][i].parameterTypes;
     		
+    		auxGpiosNames = "";
+    		for(let j = 0; j < nGpios; j++){
+    			if(j > 0)
+    				auxGpiosNames += ",";
+    			auxGpiosNames += gpiosNames[j];
+    		}
+    		
+    		auxParametersNames = "";
+    		for(let j = 0; j < nParameters; j++){
+    			if(j > 0)
+    				auxParametersNames += ",";
+    			auxParametersNames += parametersNames[j];
+    		}
+    		
+    		auxParametersTypes = "";
+    		for(let j = 0; j < nParameters; j++){
+    			if(j > 0)
+    				auxParametersTypes += ",";
+    			auxParametersTypes += parametersTypes[j];
+    		}
+    		
     		// Generate sensor div
-    		$('#sensor_data').append(	'<div class="sensor" id="sensor_'+ i +'" data-sensor_name="'+ name +'" data-sensor_n_units="'+ nUnits +'" data-sensor_n_values="'+ nValues +'" data-sensor_n_gpios="'+ nGpios +'" data-sensor_n_parameters="'+ nParameters +'">\
+    		$('#sensor_data').append(	'<div class="sensor" id="sensor_'+ i +'" data-sensor_name="'+ name +'" data-sensor_n_units="'+ nUnits +'" data-sensor_n_values="'+ nValues +'" data-sensor_n_gpios="'+ nGpios +'" data-sensor_gpios_names="'+ auxGpiosNames +'" data-sensor_n_parameters="'+ nParameters +'" data-sensor_parameters_names="'+ auxParametersNames +'" data-sensor_parameters_types="'+ auxParametersTypes +'" style="display: none;">\
     									</div>');
     		
     		// Generate sensor header div
@@ -244,7 +277,7 @@ function getSensorsConfiguration(){
 													<div class="col-9">\
 													</div>\
 													<div class="col-1">\
-														<input type="button" value="Delete sensor" onclick="depleteAndDeleteSensor('+ i +');">\
+														<input type="button" value="Delete all units" onclick="deleteAllSensorUnits('+ i +');">\
 													</div>\
 												</div>');
 			
@@ -323,7 +356,7 @@ function getSensorsConfiguration(){
     				// Value block
     				$('#sensor_'+ i +'_unit_'+ j +'_value_block_'+ k).append(	'<div class="row">\
 																					<div class="col-12">\
-																						<p>'+ valuesNames[k] +': <span id="sensor_'+ i +'_unit_'+ j +'_value_'+ k +'_span"></span></p>\
+																						<p>'+ valuesNames[k] +': <span id="sensor_'+ i +'_unit_'+ j +'_value_'+ k +'_span" data-value_type="'+ valuesTypes[k] +'"></span></p>\
 																					</div>\
 																				</div>');
     			}
@@ -344,10 +377,10 @@ function getSensorsConfiguration(){
 															<p>Ticks: <span id="sensor_'+ i +'_value_'+ j +'_ticks_span"></span></p>\
 														</div>\
 														<div class="col-3">\
-															<p>Upper threshold: <span id="sensor_'+ i +'_value_'+ j +'_upper_threshold_span" data-upper_threshold_type="'+ valuesTypes[j] +'"></span></p>\
+															<p>Upper threshold: <span id="sensor_'+ i +'_value_'+ j +'_upper_threshold_span"></span></p>\
 														</div>\
 														<div class="col-3">\
-															<p>Lower threshold: <span id="sensor_'+ i +'_value_'+ j +'_lower_threshold_span" data-lower_threshold_type="'+ valuesTypes[j] +'"></span></p>\
+															<p>Lower threshold: <span id="sensor_'+ i +'_value_'+ j +'_lower_threshold_span"></span></p>\
 														</div>\
 														<div class="col-1">\
 															<input type="button" value="Cancel" id="sensor_'+ i +'_value_'+ j +'_alerts_cancel" onclick="submitSensorAlerts('+ i +','+ j +',false);" hidden>\
@@ -363,6 +396,9 @@ function getSensorsConfiguration(){
 																	<input type="button" id="sensor_'+ i +'_alerts_button" value="Show alerts" onclick="triggerAlertsDiv('+ i +');">\
 																</div>\
 															</div>');
+    		
+    		if(nUnits > 0)
+    			document.getElementById("sensor_" + i).style.display = "block";
     	}
     });
 }
@@ -403,13 +439,13 @@ function sensorsValuesUpdate(){
 					$('#sensor_'+ i +'_unit_'+ j +'_value_'+ k +'_span').text(data[i.toString()][j][k]);
 					
 					if(i != 0){
-						if(document.getElementById('sensor_'+ i +'_value_'+ k +'_upper_threshold_span').dataset.upper_threshold_type == "INTEGER"){
+						if(document.getElementById('sensor_'+ i +'_unit_'+ j +'_value_'+ k +'_span').dataset.value_type == "INTEGER"){
 							if(parseInt(document.getElementById('sensor_'+ i +'_value_'+ k +'_upper_threshold_span').innerHTML) < data[i.toString()][j][k] || parseInt(document.getElementById('sensor_'+ i +'_value_'+ k +'_lower_threshold_span').innerHTML) > data[i.toString()][j][k])
 								document.getElementById('sensor_'+ i +'_unit_'+ j +'_value_block_'+ k).className = "value_block alert";
 							else
 								document.getElementById('sensor_'+ i +'_unit_'+ j +'_value_block_'+ k).className = "value_block calm";
 						}
-						else if(document.getElementById('sensor_'+ i +'_value_'+ k +'_upper_threshold_span').dataset.upper_threshold_type == "FLOAT"){
+						else if(document.getElementById('sensor_'+ i +'_unit_'+ j +'_value_'+ k +'_span').dataset.value_type == "FLOAT"){
 							if(parseFloat(document.getElementById('sensor_'+ i +'_value_'+ k +'_upper_threshold_span').innerHTML) < data[i.toString()][j][k] || parseFloat(document.getElementById('sensor_'+ i +'_value_'+ k +'_lower_threshold_span').innerHTML) > data[i.toString()][j][k])
 								document.getElementById('sensor_'+ i +'_unit_'+ j +'_value_block_'+ k).className = "value_block alert";
 							else
@@ -507,78 +543,59 @@ function startSensorsValuesUpdateInterval(){
 /**
  * Deploy the form to create the selected sensor.
  */
-function deploySensorForm(type){
+function deploySensorForm(id){
+	
+	var name, n_gpios, gpios_names, n_parameters, parameters_names, parameters_types;
+	
+	name = document.getElementById("sensor_" + id).dataset.sensor_name;
+	n_gpios = document.getElementById("sensor_" + id).dataset.sensor_n_gpios;
+	gpios_names = document.getElementById("sensor_" + id).dataset.sensor_gpios_names.split(",");
+	n_parameters = document.getElementById("sensor_" + id).dataset.sensor_n_parameters;
+	parameters_names = document.getElementById("sensor_" + id).dataset.sensor_parameters_names.split(",");
+	parameters_types = document.getElementById("sensor_" + id).dataset.sensor_parameters_types.split(",");
 	
 	// Generate sensor form div
 	document.getElementById("sensor_deployment_body").innerHTML =	'<div id="sensor_form">\
 																	</div>';
 	
-	// Deploy the necessary information for each sensor
-	if(type == 0) { //MQ2
-		
-		// Name
-		document.getElementById("sensor_form").innerHTML += '<h4>MQ2</h4>';
-		
-		// GPIO
+	// Add name
+	document.getElementById("sensor_form").innerHTML += '<h2>'+ name +'</h2>';
+	
+	// Add GPIOS
+	if(n_gpios > 0)
+		document.getElementById("sensor_form").innerHTML += '<h4>----------- GPIOS -----------</h4>';
+	for(let i = 0; i < n_gpios; i++){
 		document.getElementById("sensor_form").innerHTML +=	'<div class="form_row">\
-																<label for="gpio_0">Choose GPIO for A0 pin:</label>\
-																<select name="gpios_options" id="gpio_0"></select>\
-															</div>';									
-	}
-	else if(type == 1){ //DHT22
-		
-		// Name
-		document.getElementById("sensor_form").innerHTML += '<h4>DHT22</h4>';
-		
-		// GPIO
-		document.getElementById("sensor_form").innerHTML +=	'<div class="form_row">\
-																<label for="gpio_0">Choose GPIO for Data pin:</label>\
-																<select name="gpios_options" id="gpio_0"></select>\
+																<label for="gpio_'+ i +'">'+ gpios_names[i] +':</label>\
+																<select name="gpios_options" id="gpio_'+ i +'"></select>\
 															</div>';
 	}
-	else if(type == 2){ //HC-RS04
-		
-		// Name
-		document.getElementById("sensor_form").innerHTML += '<h4>HC-RS04</h4>';
-		
-		// GPIO
-		document.getElementById("sensor_form").innerHTML +=	'<div class="form_row">\
-																<label for="gpio_0">Choose GPIO for Trig pin:</label>\
-																<select name="gpios_options" id="gpio_0"></select>\
-															</div>';
-		
-		// GPIO
-		document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
-																<label for="gpio_1">Choose GPIO for Echo pin:</label>\
-																<select name="gpios_options" id="gpio_1"></select>\
-															</div>';
-		
-		// Parameter
-		document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
-																<label for="parameter_0">Distance between sensor and container:</label>\
-																<input type="number" name="Sensor_and_tank" id="parameter_0" value="1" min="1">\
-																<input type="hidden" id="parameter_0_type" name="parameter_0_type" value="INTEGER">\
-																<p>cm</p>\
-															</div>';
-		
-		// Parameter
-		document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
-																<label for="parameter_1">Depth of the container:</label>\
-																<input type="number" name="Tank" id="parameter_1" value="1" min="1">\
-																<input type="hidden" id="parameter_1_type" name="parameter_1_type" value="INTEGER">\
-																<p>cm</p>\
-															</div>';
-	}
-	else if(type == 3){ //SO-SEN
-		
-		// Name
-		document.getElementById("sensor_form").innerHTML += '<h4>SO-SEN</h4>';
-		
-		// GPIO
-		document.getElementById("sensor_form").innerHTML +=	'<div class="form_row">\
-																<label for="gpio_0">Choose GPIO for A0 pin:</label>\
-																<select name="gpios_options" id="gpio_0"></select>\
-															</div>';
+	
+	// Add parameters
+	if(n_parameters > 0)
+		document.getElementById("sensor_form").innerHTML += '<h4>----- PARAMETERS -----</h4>';
+	for(let i = 0; i < n_parameters; i++){
+		if(parameters_types[i] == "INTEGER"){
+			document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
+																	<label for="parameter_'+ i +'">'+ parameters_names[i] +':</label>\
+																	<input type="number" name="parameters_options" id="parameter_'+ i +'" value="0">\
+																	<input type="hidden" id="parameter_'+ i +'_type" name="parameter_'+ i +'_type" value="INTEGER">\
+																</div>';
+		}
+		else if(parameters_types[i] == "FLOAT"){
+			document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
+																	<label for="parameter_'+ i +'">'+ parameters_names[i] +':</label>\
+																	<input type="number" name="parameters_options" id="parameter_'+ i +'" value="0" step="0.01">\
+																	<input type="hidden" id="parameter_'+ i +'_type" name="parameter_'+ i +'_type" value="FLOAT">\
+																</div>';
+		}
+		else{
+			document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
+																	<label for="parameter_'+ i +'">'+ parameters_names[i] +':</label>\
+																	<input type="text" name="parameters_options" id="parameter_'+ i +'">\
+																	<input type="hidden" id="parameter_'+ i +'_type" name="parameter_'+ i +'_type" value="STRING">\
+																</div>';
+		}
 	}
 	
 	// Fill GPIOS options
@@ -587,123 +604,90 @@ function deploySensorForm(type){
 	// Put the buttons
 	document.getElementById("sensor_form").innerHTML += '<div class="form_row">\
 															<input type="button" value="Cancel" onclick="processData(-1);">\
-															<input type="button" value="Submit" onclick="processData('+ type +');">\
+															<input type="button" value="Submit" onclick="processData('+ id +');">\
 														</div>';
 	
-	// Generate notes div
-	document.getElementById("sensor_deployment_body").innerHTML +=	'<div id="sensor_form_notes">\
+	// Generate additional info divs
+	document.getElementById("sensor_deployment_body").innerHTML +=	'<div id="gpios_notes">\
+																	</div>\
+																	<div id="warning_notes">\
 																	</div>';
 	
-	// Deploy some important notes about the GPIOS
-	document.getElementById("sensor_form_notes").innerHTML =	'<h4>Notes:</h4>\
-																<ul>\
-																	<li>GPIO 12 is internally pulled high in the module and is not recommended for use as a touch pin.</li>\
-																	<li>GPIOS 6,7,8,9,10,11 are connected to the SPI flash integrated on the module and are not recommended for other uses</li>\
-																</ul>';
+	// Deploy some gpios notes
+	document.getElementById("gpios_notes").innerHTML =	'<h4>GPIOS (ESP32 Wrover-DevKit):</h4>\
+														<ul>\
+															<li>ADC1: 32 (CH4) || 33 (CH5) || 34 (CH6) || 35 (CH7) || 36 (CH0) || 39 (CH3)</li>\
+															<li>ADC2: 0 (CH1) || 2 (CH2) || 4 (CH0) || 12 (CH5) || 13 (CH4) || 14 (CH6) || 15 (CH3) || 25 (CH8) || 26 (CH9) || 27 (CH7)</li>\
+															<li>VSPI: 5 (CS) || 18 (CLK) || 19 (MISO) || 23 (MOSI)</li>\
+															<li>HSPI: 12 (MISO) || 13 (MOSI) || 14 (CLK) || 15 (CS)</li>\
+															<li>DEEP SLEEP: 0 (RTC11) || 2 (RTC12) || 4 (RTC10) || 12 (RTC15) || 13 (RTC14) || 14 (RTC16) || 15 (RTC13) || 25 (RTC6) || 26 (RTC7) || 27 (RTC17) || 32 (RTC9) || 33 (RTC8) || 34 (RTC4) || 35 (RTC5) || 36 (RTC0) || 39 (RTC3)</li>\
+															<li>TOUCH SENS: 0 (CH1) || 2 (CH2) || 4 (CH0) || 12 (CH5) || 13 (CH4) || 14 (CH6) || 15 (CH3) || 27 (CH7) || 32 (CH9) || 33 (CH8)</li>\
+															<li>I2C: 21 (SDA) || 22 (SCL)</li>\
+															<li>DAC: 25 (CH1) || 26 (CH2)</li>\
+															<li>SD: 2 (DAT0) || 4 (DAT1) || 12 (DAT2) || 13 (DAT3) || 14 (CLK) || 15 (CMD)</li>\
+															<li>UART: 1 (TX0) || 3 (RX0)</li>\
+														</ul>';
 	
 	
+	// Deploy some warning notes
+	document.getElementById("warning_notes").innerHTML =	'<h4>Warnings:</h4>\
+															<ul>\
+																<li>GPIO 12 is internally pulled high in the module and is not recommended for use as a touch pin.</li>\
+																<li>GPIOS 6,7,8,9,10,11 are connected to the SPI flash integrated on the module and are not recommended for other uses.</li>\
+																<li>ADC2 channels shouldn\'t be used while ESP32 WiFi function is active. (Values obtained will be incorrect)</li>\
+																<li>GPIOS 0,2,5,12,15 are strapping pins.</li>\
+																<li>GPIOS 12,13,14,15 are usually used for inline debug.</li>\
+																<li>GPIOS 34,35,36,39 can only be set as input mode and do not support pullup or pulldown functions.</li>\
+																<li>GPIOS 1,3 are usually used for flashing and debugging.</li>\
+																<li>Do not use GPIOS 36,39 interrupts when using ADC or WiFi and Bluetooth with sleep mode enabled.</li>\
+															</ul>';
 }
 
 /**
  * Process the data to create the selected sensor.
  */
-function processData(type){
+function processData(id){
 	
-	var id, nGpios, nParameters;
-	var k = 0, ok = true;
-	
-	if(type == 0){ // MQ2
-		id = sensorLocation("MQ2");
-		nGpios = 1;
-		nParameters = 0;
-	}
-	else if(type == 1){ // DHT22
-		id = sensorLocation("DHT22");
-		nGpios = 1;
-		nParameters = 0;
-	}
-	else if(type == 2){ // HC-RS04
-		id = sensorLocation("HC-RS04");
-		nGpios = 2;
-		nParameters = 2;
-	}
-	else if(type == 3){ // SO-SEN
-		id = sensorLocation("SO-SEN");
-		nGpios = 1;
-		nParameters = 0;
-	}
-	
-	if(type != -1){
+	if(id != -1){
+		
+		var nGpios = document.getElementById("sensor_" + id).dataset.sensor_n_gpios;
+		var nParameters = document.getElementById("sensor_" + id).dataset.sensor_n_parameters;
+		var k = 0, ok = true;
 		
 		while(k < nGpios && ok){
 			if(document.getElementById("gpio_"+ k).value == 0){
 				ok = false;
-				window.alert('Error, don\'t let any GPIO with "None"');
+				window.alert('Error, don\'t let any GPIO selected as "None"');
 			}
 			else
 				k++;
 		}
 		
-		if(ok && validInfo(type, nGpios, nParameters)){
-			if(id == sensorsInstalled){
-				addSensor(type);
+		k = 0;
+		
+		while(k < nParameters && ok){
+			if(document.getElementById("parameter_"+ k).value.length == 0){
+				ok = false;
+				window.alert('Error, don\'t let any parameters empty');
 			}
-			
-			addSensorUnit(id, nGpios, nParameters);
+			else
+				k++;
 		}
+		
+		if(ok)
+			addSensorUnit(id);
 	}
 	
 	clearDiv("sensor_deployment_body");
 }
 
-function sensorLocation(sensor){
+function addSensorUnit(id){
 	
-	var i = 0, found = false;
-	
-	while(!found && i < sensorsInstalled){
-		if(document.getElementById("sensor_"+ i).dataset.sensor_name == sensor)
-			found = true;
-		else
-			i++;
-	}
-	
-	return i;
-}
-
-function validInfo(type, nGpios, nParameters){
-	
+	var nGpios, nParameters;
 	var gpios = "", parameters = "";
 	
-	for(let i = 0; i < nGpios; i++){
-		gpios += gpioOptions[document.getElementById("gpio_"+ i).value] + "\n";
-	}
-	
-	for(let i = 0; i < nParameters; i++){
-		parameters += document.getElementById("parameter_"+ i + "_type").value + "\n";
-		parameters += document.getElementById("parameter_"+ i).value + "\n";
-	}
-	
-	// Http Request
-	var request = new XMLHttpRequest();
-	var requestURL = "/ValidateInfo";		//ValidateInfo has to be handled
-	
-	request.open('POST', requestURL, false);
-	
-	request.send(nGpios + "\n" + gpios + nParameters + "\n" + parameters + type + "\0");
-	
-    if (request.readyState == 4 && request.status == 200) {
-    	window.alert(request.responseText);
-    }
-    
-    if(request.responseText === "Info is valid")
-    	return true;
-    else
-    	return false;
-}
-
-function addSensorUnit(id, nGpios, nParameters){
-	
-	var gpios = "", parameters = "";
+	nGpios = document.getElementById("sensor_" + id).dataset.sensor_n_gpios;
+	nParameters = document.getElementById("sensor_" + id).dataset.sensor_n_parameters;
 	
 	for(let i = 0; i < nGpios; i++){
 		gpios += gpioOptions[document.getElementById("gpio_"+ i).value] + "\n";
@@ -744,51 +728,17 @@ function deleteSensorUnit(i,j)
     	window.alert(request.responseText);
     }
 	
-	if((document.getElementById("sensor_"+ i).dataset.sensor_n_units - 1) == 0){
-		deleteSensor(i);
-	}
-	
 	clearDiv("sensor_data");
 	initSensors();
 }
 
-function addSensor(type)
-{
-	// Http Request
-	var request = new XMLHttpRequest();
-	var requestURL = "/SensorAddition";		//SensorAddition has to be handled
-	
-	request.open('POST', requestURL, false);
-	
-	request.send(type + "\0");
-	
-    if (request.readyState == 4 && request.status == 200) {
-    	window.alert(request.responseText);
-    }
-}
-
-function deleteSensor(i)
-{
-	// Http Request
-	var request = new XMLHttpRequest();
-	var requestURL = "/SensorDeletion";		//SensorDeletion has to be handled
-	
-	request.open('POST', requestURL, false);
-	
-	request.send(i + "\0");
-	
-    if (request.readyState == 4 && request.status == 200) {
-    	window.alert(request.responseText);
-    }
-}
-
-function depleteAndDeleteSensor(i)
+function deleteAllSensorUnits(i)
 {
 	var request;
 	var requestURL;
-	const sensorNUnits = document.getElementById("sensor_" + i).dataset.sensor_n_units;
+	var nUnits = document.getElementById("sensor_" + i).dataset.sensor_n_units;
 	
-	for(let j = sensorNUnits - 1; j >= 0; j--){
+	for(let j = nUnits - 1; j >= 0; j--){
 		// Http Request
 		request = new XMLHttpRequest();
 		requestURL = "/SensorUnitDeletion";		//SensorUnitDeletion has to be handled
@@ -798,7 +748,7 @@ function depleteAndDeleteSensor(i)
 		request.send(i + "\n" + j + "\0");
 	}
 	
-	deleteSensor(i);
+	window.alert('All sensor units deleted');
 	
 	clearDiv("sensor_data");
 	initSensors();
@@ -927,15 +877,16 @@ function submitSensorGpios(i,j,process)
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_gpios_submit').hidden = true;
 	
 	if(process == true){
-		var x = 0, ok = true;
 		
-		const nGpios = document.getElementById("sensor_"+ i).dataset.sensor_n_gpios;
+		var nGpios = document.getElementById("sensor_"+ i).dataset.sensor_n_gpios;
 		var gpios = "";
+
+		var x = 0, ok = true;
 		
 		while(x < nGpios && ok){
 			if(document.getElementById('sensor_'+ i +'_unit_'+ j +'_gpio_'+ x +'_selected').value == 0){
 				ok = false;
-				window.alert('Error, don\'t let any GPIO with "None"');
+				window.alert('Error, don\'t let any GPIO selected as "None"');
 			}
 			else
 				x++;
@@ -975,7 +926,7 @@ function editSensorGpios(i,j)
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_gpios_cancel').hidden = false;
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_gpios_submit').hidden = false;
 	
-	const nGpios = document.getElementById("sensor_" + i).dataset.sensor_n_gpios;
+	var nGpios = document.getElementById("sensor_" + i).dataset.sensor_n_gpios;
 	
 	for(let k = 0; k < nGpios; k++){
 		document.getElementById('sensor_'+ i +'_unit_'+ j +'_gpio_'+ k +'_span').innerHTML = '<select name="gpios_options" id="sensor_'+ i +'_unit_'+ j +'_gpio_'+ k +'_selected"></select>';
@@ -992,24 +943,37 @@ function submitSensorParameters(i,j,process)
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameters_submit').hidden = true;
 	
 	if(process == true){
-		const nParameters = document.getElementById("sensor_"+ i).dataset.sensor_n_parameters;
+		var nParameters = document.getElementById("sensor_"+ i).dataset.sensor_n_parameters;
 		var parameters = "";
 		
-		for(let k = 0; k < nParameters; k++){
-			parameters += document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').dataset.parameter_type + "\n";
-			parameters += document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected').value + "\n";
+		var x = 0, ok = true;
+		
+		while(x < nParameters && ok){
+			if(document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ x +'_selected').value.length == 0){
+				ok = false;
+				window.alert('Error, don\'t let any parameters empty');
+			}
+			else
+				x++;
 		}
+		
+		if(ok){
+			for(let k = 0; k < nParameters; k++){
+				parameters += document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').dataset.parameter_type + "\n";
+				parameters += document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected').value + "\n";
+			}
+				
+			// Http Request
+			var request = new XMLHttpRequest();
+			var requestURL = "/SensorEditParameters";		//SensorEditParameters has to be handled
 			
-		// Http Request
-		var request = new XMLHttpRequest();
-		var requestURL = "/SensorEditParameters";		//SensorEditParameters has to be handled
-		
-		request.open('POST', requestURL, false);
-		
-		request.send(nParameters + "\n" + parameters + i + "\n" + j + "\0");
-		
-		if (request.readyState == 4 && request.status == 200) {
-			window.alert(request.responseText);
+			request.open('POST', requestURL, false);
+			
+			request.send(nParameters + "\n" + parameters + i + "\n" + j + "\0");
+			
+			if (request.readyState == 4 && request.status == 200) {
+				window.alert(request.responseText);
+			}
 		}
 	}
 	
@@ -1025,15 +989,15 @@ function editSensorParameters(i,j)
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameters_cancel').hidden = false;
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameters_submit').hidden = false;
 	
-	const nParameters = document.getElementById("sensor_" + i).dataset.sensor_n_parameters;
+	var nParameters = document.getElementById("sensor_" + i).dataset.sensor_n_parameters;
 	
 	for(let k = 0; k < nParameters; k++){
 		if(document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').dataset.parameter_type == "INTEGER")
-			document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML = '<input type="number" name="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" id="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" value="0">';
+			document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML = '<input type="number" name="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" id="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" value="'+ document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML +'">';
 		else if(document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').dataset.parameter_type == "FLOAT")
-			document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML = '<input type="number" name="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" id="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" value="0" step="0.01">';
+			document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML = '<input type="number" name="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" id="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" value="'+ document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML +'" step="0.01">';
 		else
-			document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML = '<input type="text" name="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" id="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected">';
+			document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML = '<input type="text" name="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" id="sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_selected" value="'+ document.getElementById('sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').innerHTML +'">';
 	}
 }
 
@@ -1044,22 +1008,31 @@ function submitSensorAlerts(i,j,process)
 	document.getElementById('sensor_'+ i +'_value_'+ j +'_alerts_submit').hidden = true;
 	
 	if(process == true){
-		const alert = $('input[name="sensor_'+ i +'_value_'+ j +'_alert"]:checked').val();
-		const ticks = document.getElementById('sensor_'+ i +'_value_'+ j +'_ticks_selected').value;
-		const thresholdType = document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').dataset.upper_threshold_type;
-		const upperThreshold = document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_selected').value;
-		const lowerThreshold = document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_selected').value;
+		var alert = $('input[name="sensor_'+ i +'_value_'+ j +'_alert"]:checked').val();
+		var ticks = document.getElementById('sensor_'+ i +'_value_'+ j +'_ticks_selected').value;
+		var thresholdType = document.getElementById('sensor_'+ i +'_unit_0_value_'+ j +'_span').dataset.value_type;
+		var upperThreshold = document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_selected').value;
+		var lowerThreshold = document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_selected').value;
 		
-		// Http Request
-		var request = new XMLHttpRequest();
-		var requestURL = "/SensorEditAlerts";		//SensorEditAlerts has to be handled
+		var ok = true;
 		
-		request.open('POST', requestURL, false);
+		if(ticks.length == 0 || upperThreshold.length == 0 || lowerThreshold.length == 0){
+			ok = false;
+			window.alert('Error, don\'t let any values empty');
+		}
 		
-		request.send(i + "\n" + j + "\n" + alert + "\n" + ticks + "\n" + thresholdType + "\n" + upperThreshold + "\n" + lowerThreshold + "\0");
-		
-		if (request.readyState == 4 && request.status == 200) {
-			window.alert(request.responseText);
+		if(ok){
+			// Http Request
+			var request = new XMLHttpRequest();
+			var requestURL = "/SensorEditAlerts";		//SensorEditAlerts has to be handled
+			
+			request.open('POST', requestURL, false);
+			
+			request.send(i + "\n" + j + "\n" + alert + "\n" + ticks + "\n" + thresholdType + "\n" + upperThreshold + "\n" + lowerThreshold + "\0");
+			
+			if (request.readyState == 4 && request.status == 200) {
+				window.alert(request.responseText);
+			}
 		}
 	}
 	
@@ -1075,21 +1048,28 @@ function editSensorAlerts(i,j)
 	document.getElementById('sensor_'+ i +'_value_'+ j +'_alerts_cancel').hidden = false;
 	document.getElementById('sensor_'+ i +'_value_'+ j +'_alerts_submit').hidden = false;
 	
-	document.getElementById('sensor_'+ i +'_value_'+ j +'_alert_span').innerHTML = 	'<label for="sensor_'+ i +'_value_'+ j +'_alert_selected_true">True</label> <input type="radio" id="sensor_'+ i +'_value_'+ j +'_alert_selected_true" name="sensor_'+ i +'_value_'+ j +'_alert" value="True">\
-																					<label for="sensor_'+ i +'_value_'+ j +'_alert_selected_false">False</label> <input type="radio" id="sensor_'+ i +'_value_'+ j +'_alert_selected_false" name="sensor_'+ i +'_value_'+ j +'_alert" value="False" checked>';
-	document.getElementById('sensor_'+ i +'_value_'+ j +'_ticks_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_ticks_selected" id="sensor_'+ i +'_value_'+ j +'_ticks_selected" value="1" min="1">';
-	
-	if(document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').dataset.upper_threshold_type == "INTEGER"){
-		document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" value="0">';
-		document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" value="0">';
-	}
-	else if(document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').dataset.upper_threshold_type == "FLOAT"){
-		document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" value="0" step="0.01">';
-		document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" value="0" step="0.01">';
+	if(document.getElementById('sensor_'+ i +'_value_'+ j +'_alert_span').innerHTML == "false"){
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_alert_span').innerHTML = 	'<label for="sensor_'+ i +'_value_'+ j +'_alert_selected_true">True</label> <input type="radio" id="sensor_'+ i +'_value_'+ j +'_alert_selected_true" name="sensor_'+ i +'_value_'+ j +'_alert" value="True">\
+																						<label for="sensor_'+ i +'_value_'+ j +'_alert_selected_false">False</label> <input type="radio" id="sensor_'+ i +'_value_'+ j +'_alert_selected_false" name="sensor_'+ i +'_value_'+ j +'_alert" value="False" checked>';
 	}
 	else{
-		document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML = '<input type="text" name="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected">';
-		document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML = '<input type="text" name="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected">';
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_alert_span').innerHTML = 	'<label for="sensor_'+ i +'_value_'+ j +'_alert_selected_true">True</label> <input type="radio" id="sensor_'+ i +'_value_'+ j +'_alert_selected_true" name="sensor_'+ i +'_value_'+ j +'_alert" value="True"  checked>\
+																						<label for="sensor_'+ i +'_value_'+ j +'_alert_selected_false">False</label> <input type="radio" id="sensor_'+ i +'_value_'+ j +'_alert_selected_false" name="sensor_'+ i +'_value_'+ j +'_alert" value="False">';
+	}
+	
+	document.getElementById('sensor_'+ i +'_value_'+ j +'_ticks_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_ticks_selected" id="sensor_'+ i +'_value_'+ j +'_ticks_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_ticks_span').innerHTML +'" min="1">';
+	
+	if(document.getElementById('sensor_'+ i +'_unit_0_value_'+ j +'_span').dataset.value_type == "INTEGER"){
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML +'">';
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML +'">';
+	}
+	else if(document.getElementById('sensor_'+ i +'_unit_0_value_'+ j +'_span').dataset.value_type == "FLOAT"){
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML +'" step="0.01">';
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML = '<input type="number" name="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML +'" step="0.01">';
+	}
+	else{
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML = '<input type="text" name="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_upper_threshold_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_upper_threshold_span').innerHTML +'">';
+		document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML = '<input type="text" name="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" id="sensor_'+ i +'_value_'+ j +'_lower_threshold_selected" value="'+ document.getElementById('sensor_'+ i +'_value_'+ j +'_lower_threshold_span').innerHTML +'">';
 	}
 }
 
