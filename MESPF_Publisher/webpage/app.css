@@ -42,6 +42,10 @@ ul {
 	list-style-position: inside;
 }
 
+li:not(:last-child) {
+	margin-bottom: 10px;
+}
+
 input[type=text], input[type=number] {
 	text-align: center;
 }
@@ -136,6 +140,10 @@ header .row {
 	border-width: 4px;
 }
 
+.form_row {
+	margin: 10px;
+}
+
 #sensor_form {
 	font-family: "Times New Roman", Times, serif;
     text-align: center;
@@ -151,12 +159,24 @@ header .row {
 	border-color: black;
 }
 
-#sensor_form_notes {
-	padding-left: 20px;
+#sensor_form h2 {
+	text-decoration-line: underline;
+}
+
+#gpios_notes {
+	padding: 20px;
 	background: rgba(0, 0, 128, 0.1);
 	border: solid;
 	border-width: 2px;
 	border-color: blue;
+}
+
+#warning_notes {
+	padding: 20px;
+	background: rgba(128, 0, 0, 0.1);
+	border: solid;
+	border-width: 2px;
+	border-color: red;
 }
 
 .sensor {
@@ -167,7 +187,7 @@ header .row {
 	margin: 2px;
 }
 
-.sensor_header h4, .form_row {
+.sensor_header h4 {
 	margin: 3px;
 }
 
