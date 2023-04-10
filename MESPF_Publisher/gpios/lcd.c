@@ -92,7 +92,7 @@ static void lcd_send_data(char data){
 
 static void lcd_task(void *pvParameters){
 
-	int fr_size, sr_size, move_n, n_units;
+	int fr_size, sr_size, move_n, n_units, n_free;
 	sensor_data_t* aux;
 	char number[12];
 
@@ -323,8 +323,13 @@ static void lcd_task(void *pvParameters){
 					vTaskDelay(LCD_TIME_TO_SHOW_NEXT);
 				}
 
-				for(int j = 0; j < n_units; j++)
-					free(aux[j].sensor_values);
+				// Free sensor data pointers
+				n_free = 0;
+
+				do{
+					free(aux[n_free].sensor_values);
+					n_free++;
+				}while (n_free < n_units);
 				free(aux);
 			}
 			else{
