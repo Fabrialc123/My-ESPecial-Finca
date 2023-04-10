@@ -20,7 +20,7 @@
 #include "gpios_manager.h"
 #include "sensors_manager.h"
 
-// Values related to the DHT22 sensor in general
+// DHT22 general information
 
 static TaskHandle_t task_dht22 					= NULL;
 
@@ -39,21 +39,13 @@ static int dht22_cont							= 0;
 
 // Values related to the alerts
 
-	// 0: Humidity
-static bool dht22_alert_humidity				= false;
-static int dht22_humidity_ticks_to_alert		= 5;
-static float dht22_humidity_upper_threshold		= 1000.0;
-static float dht22_humidity_lower_threshold		= -1000.0;
+static dht22_alerts_t dht22_alerts;
 
+	/* Humidity */
 static int* humidity_alert_counter;
 static bool* humidity_is_alerted;
 
-	// 1: Temperature
-static bool dht22_alert_temperature				= false;
-static int dht22_temperature_ticks_to_alert		= 5;
-static float dht22_temperature_upper_threshold	= 1000.0;
-static float dht22_temperature_lower_threshold	= -1000.0;
-
+	/* Temperature */
 static int* temperature_alert_counter;
 static bool* temperature_is_alerted;
 
@@ -61,27 +53,42 @@ static bool* temperature_is_alerted;
 
 #define nvs_DHT22_CONT_key		"dht22_cont"
 #define nvs_DHT22_GPIOS_key		"dht22_gpios"
+#define nvs_DHT22_ALERTS_key	"dht22_alert"
 
 /**
- * Shift and delete
+ * Check if position is valid
  */
-static void shift_delete(int pos){
+static bool check_valid_pos(int pos){
+	bool valid;
 
-	for(int i = pos; i < dht22_cont - 1; i++){
+	pthread_mutex_lock(&mutex_dht22);
 
-		dht22_gpios_array[pos].data = dht22_gpios_array[pos + 1].data;
+	if(pos < 0 || pos >= dht22_cont)
+		valid = false;
+	else
+		valid = true;
 
-		dht22_data_array[pos].humidity = dht22_data_array[pos + 1].humidity;
-		dht22_data_array[pos].temperature = dht22_data_array[pos + 1].temperature;
+	pthread_mutex_unlock(&mutex_dht22);
 
-		humidity_alert_counter[pos] = humidity_alert_counter[pos + 1];
-		humidity_is_alerted[pos] = humidity_is_alerted[pos + 1];
+	return valid;
+}
 
-		temperature_alert_counter[pos] = temperature_alert_counter[pos + 1];
-		temperature_is_alerted[pos] = temperature_is_alerted[pos + 1];
-	}
+/**
+ * Check if GPIOS can be liberated
+ */
+static bool check_free_gpios(int pos, char* reason){
+	bool valid;
 
-	dht22_cont--;
+	pthread_mutex_lock(&mutex_dht22);
+
+	if(gpios_manager_free_gpios(&dht22_gpios_array[pos].data, DHT22_N_GPIOS, reason) == -1)
+		valid = false;
+	else
+		valid = true;
+
+	pthread_mutex_unlock(&mutex_dht22);
+
+	return valid;
 }
 
 /**
@@ -218,12 +225,12 @@ static void dht22_task(void *pvParameters){
 			}
 
 			// Humidity alert
-			if(dht22_alert_humidity){
+			if(dht22_alerts.humidity_alert){
 
 				// Update counter
-				if((dht22_data_array[x].humidity < dht22_humidity_lower_threshold) && (humidity_alert_counter[x] > -dht22_humidity_ticks_to_alert))
+				if((dht22_data_array[x].humidity < dht22_alerts.humidity_lower_threshold) && (humidity_alert_counter[x] > -dht22_alerts.humidity_ticks_to_alert))
 					humidity_alert_counter[x]--;
-				else if((dht22_data_array[x].humidity > dht22_humidity_upper_threshold) && (humidity_alert_counter[x] < dht22_humidity_ticks_to_alert))
+				else if((dht22_data_array[x].humidity > dht22_alerts.humidity_upper_threshold) && (humidity_alert_counter[x] < dht22_alerts.humidity_ticks_to_alert))
 					humidity_alert_counter[x]++;
 				else{
 					if(humidity_alert_counter[x] > 0)
@@ -238,14 +245,14 @@ static void dht22_task(void *pvParameters){
 				}
 
 				// Check if it is the moment to alert
-				if((humidity_alert_counter[x] == -dht22_humidity_ticks_to_alert) && !humidity_is_alerted[x]){
+				if((humidity_alert_counter[x] == -dht22_alerts.humidity_ticks_to_alert) && !humidity_is_alerted[x]){
 
 					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on lower threshold (value: humidity)");
 
 					humidity_is_alerted[x] = true;
 					msg_id++;
 				}
-				else if((humidity_alert_counter[x] == dht22_humidity_ticks_to_alert) && !humidity_is_alerted[x]){
+				else if((humidity_alert_counter[x] == dht22_alerts.humidity_ticks_to_alert) && !humidity_is_alerted[x]){
 
 					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on upper threshold (value: humidity)");
 
@@ -255,12 +262,12 @@ static void dht22_task(void *pvParameters){
 			}
 
 			// Temperature alert
-			if(dht22_alert_temperature){
+			if(dht22_alerts.temperature_alert){
 
 				// Update counter
-				if((dht22_data_array[x].temperature < dht22_temperature_lower_threshold) && (temperature_alert_counter[x] > -dht22_temperature_ticks_to_alert))
+				if((dht22_data_array[x].temperature < dht22_alerts.temperature_lower_threshold) && (temperature_alert_counter[x] > -dht22_alerts.temperature_ticks_to_alert))
 					temperature_alert_counter[x]--;
-				else if((dht22_data_array[x].temperature > dht22_temperature_upper_threshold) && (temperature_alert_counter[x] < dht22_temperature_ticks_to_alert))
+				else if((dht22_data_array[x].temperature > dht22_alerts.temperature_upper_threshold) && (temperature_alert_counter[x] < dht22_alerts.temperature_ticks_to_alert))
 					temperature_alert_counter[x]++;
 				else{
 					if(temperature_alert_counter[x] > 0)
@@ -275,14 +282,14 @@ static void dht22_task(void *pvParameters){
 				}
 
 				// Check if it is the moment to alert
-				if((temperature_alert_counter[x] == -dht22_temperature_ticks_to_alert) && !temperature_is_alerted[x]){
+				if((temperature_alert_counter[x] == -dht22_alerts.temperature_ticks_to_alert) && !temperature_is_alerted[x]){
 
 					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on lower threshold (value: temperature)");
 
 					temperature_is_alerted[x] = true;
 					msg_id++;
 				}
-				else if((temperature_alert_counter[x] == dht22_temperature_ticks_to_alert) && !temperature_is_alerted[x]){
+				else if((temperature_alert_counter[x] == dht22_alerts.temperature_ticks_to_alert) && !temperature_is_alerted[x]){
 
 					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on upper threshold (value: temperature)");
 
@@ -298,55 +305,76 @@ static void dht22_task(void *pvParameters){
 	}
 }
 
-void dht22_startup(void){
-	size_t size = 0;
-	uint8_t aux = 0;
-
-	nvs_app_get_uint8_value(nvs_DHT22_CONT_key,&aux);
-
-	dht22_cont = aux;
-
-	dht22_gpios_array = (dht22_gpios_t*) malloc(sizeof(dht22_gpios_t) * dht22_cont);
-	dht22_data_array = (dht22_data_t*) malloc(sizeof(dht22_data_t) * dht22_cont);
-
-	humidity_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
-	humidity_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
-
-	temperature_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
-	temperature_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
-
-	if(dht22_cont > 0){
-		nvs_app_get_blob_value(nvs_DHT22_GPIOS_key,NULL,&size);
-		if(size != 0)
-			nvs_app_get_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,&size);
-
-		int gpios[DHT22_N_GPIOS];
-		for(int i = 0; i < dht22_cont; i++){
-			gpios[0] = dht22_gpios_array[i].data;
-			gpios_manager_lock(gpios, DHT22_N_GPIOS);
-		}
-
-		dht22_init();
-	}
-}
-
 void dht22_init(void){
 
-	if(pthread_mutex_init(&mutex_dht22, NULL) != 0){
+	if(g_dht22_initialized == true)
+		ESP_LOGE(TAG,"DHT22 already initialized");
+	else if(pthread_mutex_init(&mutex_dht22, NULL) != 0)
 		ESP_LOGE(TAG,"Failed to initialize the DHT22 mutex");
-	}
 	else{
 		int res_rec, res_sen;
 
 		res_rec = register_recollecter(&dht22_get_sensors_data, &dht22_get_sensors_gpios, &dht22_get_sensors_additional_parameters);
-		res_sen = sensors_manager_add(&dht22_destroy, &dht22_add_sensor, &dht22_delete_sensor, &dht22_set_gpios, &dht22_set_parameters, &dht22_set_alert_values);
+		res_sen = sensors_manager_add(&dht22_add_sensor, &dht22_delete_sensor, &dht22_set_gpios, &dht22_set_parameters, &dht22_set_alert_values);
 
 		if(res_rec == 1 && res_sen == 1){
-			ESP_LOGI(TAG, "DHT22 recollecter successfully registered");
+
+			size_t size = 0;
+			uint8_t aux = 0;
+
+			/* Load & Startup information */
+
+			// Get "cont"
+			nvs_app_get_uint8_value(nvs_DHT22_CONT_key,&aux);
+			dht22_cont = aux;
+
+			// Initialize pointers
+			dht22_gpios_array = (dht22_gpios_t*) malloc(sizeof(dht22_gpios_t) * dht22_cont);
+			dht22_data_array = (dht22_data_t*) malloc(sizeof(dht22_data_t) * dht22_cont);
+
+			humidity_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
+			humidity_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
+
+			temperature_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
+			temperature_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
+
+			// Initialize alerts
+			dht22_alerts.humidity_alert = false;
+			dht22_alerts.humidity_ticks_to_alert = 10;
+			dht22_alerts.humidity_upper_threshold = 1000;
+			dht22_alerts.humidity_lower_threshold = -1000;
+
+			dht22_alerts.temperature_alert = false;
+			dht22_alerts.temperature_ticks_to_alert = 10;
+			dht22_alerts.temperature_upper_threshold = 1000;
+			dht22_alerts.temperature_lower_threshold = -1000;
+
+			// Get alert values
+			nvs_app_get_blob_value(nvs_DHT22_ALERTS_key,NULL,&size);
+			if(size != 0)
+				nvs_app_get_blob_value(nvs_DHT22_ALERTS_key,&dht22_alerts,&size);
+
+			// In case of "cont" > 0 load extra information
+			if(dht22_cont > 0){
+				char dump[100];
+				size = 0;
+
+				nvs_app_get_blob_value(nvs_DHT22_GPIOS_key,NULL,&size);
+				if(size != 0)
+					nvs_app_get_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,&size);
+
+				int gpios[DHT22_N_GPIOS];
+				for(int i = 0; i < dht22_cont; i++){
+					gpios[0] = dht22_gpios_array[i].data;
+					gpios_manager_lock_gpios(gpios, DHT22_N_GPIOS, dump);
+				}
+			}
 
 			xTaskCreatePinnedToCore(&dht22_task, "dht22_task", DHT22_STACK_SIZE, NULL, DHT22_PRIORITY, &task_dht22, DHT22_CORE_ID);
 
 			g_dht22_initialized = true;
+
+			ESP_LOGI(TAG, "DHT22 successfully registered");
 		}
 		else{
 			ESP_LOGE(TAG, "Error, DHT22 recollecter or sensor manager hasn't been registered");
@@ -354,138 +382,128 @@ void dht22_init(void){
 	}
 }
 
-void dht22_destroy(void){
-
-	if(pthread_mutex_destroy(&mutex_dht22) != 0){
-		ESP_LOGE(TAG,"Failed to destroy the DHT22 mutex");
-	}
-	else{
-		ESP_LOGI(TAG, "DHT22 recollecter and sensor manager successfully destroyed");
-
-		vTaskDelete(task_dht22);
-
-		g_dht22_initialized = false;
-	}
-}
-
-int dht22_add_sensor(int* gpios, union sensor_value_u* parameters){
-
-	int res;
-
+int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason){
 	if(!g_dht22_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
+		ESP_LOGE(TAG, "DHT22 not initialized");
+		sprintf(reason, "DHT22 not initialized");
+
 		return -1;
 	}
 
-	res = gpios_manager_lock(gpios, DHT22_N_GPIOS);
-
-	if(res == 1){
-
-		pthread_mutex_lock(&mutex_dht22);
-
-		ESP_LOGI(TAG, "Sensor installed");
-
-		dht22_cont++;
-
-		dht22_gpios_array = (dht22_gpios_t*) realloc(dht22_gpios_array, sizeof(dht22_gpios_t) * dht22_cont);
-		dht22_data_array = (dht22_data_t*) realloc(dht22_data_array, sizeof(dht22_data_t) * dht22_cont);
-
-		humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
-		humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
-
-		temperature_alert_counter = (int*) realloc(temperature_alert_counter, sizeof(int) * dht22_cont);
-		temperature_is_alerted = (bool*) realloc(temperature_is_alerted, sizeof(bool) * dht22_cont);
-
-		dht22_gpios_array[dht22_cont - 1].data = gpios[0];
-
-		dht22_data_array[dht22_cont - 1].humidity = 0.0;
-		dht22_data_array[dht22_cont - 1].temperature = 0.0;
-
-		humidity_alert_counter[dht22_cont - 1] = 0;
-		humidity_is_alerted[dht22_cont - 1] = false;
-
-		temperature_alert_counter[dht22_cont - 1] = 0;
-		temperature_is_alerted[dht22_cont - 1] = false;
-
-		nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
-		nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
-
-		pthread_mutex_unlock(&mutex_dht22);
-	}
-
-	return res;
-}
-
-int dht22_delete_sensor(int pos){
-
-	int res;
-
-	if(!g_dht22_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
+	if(gpios_manager_lock_gpios(gpios, DHT22_N_GPIOS, reason) == -1)
 		return -1;
-	}
 
 	pthread_mutex_lock(&mutex_dht22);
 
-	if(pos < 0 || pos >= dht22_cont){
-		pthread_mutex_unlock(&mutex_dht22);
+	dht22_cont++;
 
-		ESP_LOGE(TAG, "Error, the position is invalid");
-		return -1;
-	}
+	dht22_gpios_array = (dht22_gpios_t*) realloc(dht22_gpios_array, sizeof(dht22_gpios_t) * dht22_cont);
+	dht22_data_array = (dht22_data_t*) realloc(dht22_data_array, sizeof(dht22_data_t) * dht22_cont);
 
-	res = gpios_manager_free(&dht22_gpios_array[pos].data, DHT22_N_GPIOS);
+	humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
+	humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
 
-	if(res == 1){
+	temperature_alert_counter = (int*) realloc(temperature_alert_counter, sizeof(int) * dht22_cont);
+	temperature_is_alerted = (bool*) realloc(temperature_is_alerted, sizeof(bool) * dht22_cont);
 
-		ESP_LOGI(TAG, "Sensor deleted");
+	dht22_gpios_array[dht22_cont - 1].data = gpios[0];
 
-		shift_delete(pos);
+	dht22_data_array[dht22_cont - 1].humidity = 0.0;
+	dht22_data_array[dht22_cont - 1].temperature = 0.0;
 
-		dht22_gpios_array = (dht22_gpios_t*) realloc(dht22_gpios_array, sizeof(dht22_gpios_t) * dht22_cont);
-		dht22_data_array = (dht22_data_t*) realloc(dht22_data_array, sizeof(dht22_data_t) * dht22_cont);
+	humidity_alert_counter[dht22_cont - 1] = 0;
+	humidity_is_alerted[dht22_cont - 1] = false;
 
-		humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
-		humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
+	temperature_alert_counter[dht22_cont - 1] = 0;
+	temperature_is_alerted[dht22_cont - 1] = false;
 
-		temperature_alert_counter = (int*) realloc(temperature_alert_counter, sizeof(int) * dht22_cont);
-		temperature_is_alerted = (bool*) realloc(temperature_is_alerted, sizeof(bool) * dht22_cont);
-
-		nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
-		nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
-	}
+	nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
+	nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
 
 	pthread_mutex_unlock(&mutex_dht22);
 
-	return res;
+	ESP_LOGI(TAG, "Sensor installed");
+
+	return 1;
 }
 
-int dht22_set_gpios(int pos, int* gpios){
-
+int dht22_delete_sensor(int pos, char* reason){
 	if(!g_dht22_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
+		ESP_LOGE(TAG, "DHT22 not initialized");
+		sprintf(reason, "DHT22 not initialized");
+
 		return -1;
 	}
+
+	if(!check_valid_pos(pos)){
+		ESP_LOGE(TAG, "Position not valid");
+		sprintf(reason, "Position not valid");
+
+		return -1;
+	}
+
+	if(!check_free_gpios(pos, reason))
+		return -1;
 
 	pthread_mutex_lock(&mutex_dht22);
 
-	if(pos < 0 || pos >= dht22_cont){
-		pthread_mutex_unlock(&mutex_dht22);
+	for(int i = pos; i < dht22_cont - 1; i++){
 
-		ESP_LOGE(TAG, "Error, the position is invalid");
+		dht22_gpios_array[pos].data = dht22_gpios_array[pos + 1].data;
+
+		dht22_data_array[pos].humidity = dht22_data_array[pos + 1].humidity;
+		dht22_data_array[pos].temperature = dht22_data_array[pos + 1].temperature;
+
+		humidity_alert_counter[pos] = humidity_alert_counter[pos + 1];
+		humidity_is_alerted[pos] = humidity_is_alerted[pos + 1];
+
+		temperature_alert_counter[pos] = temperature_alert_counter[pos + 1];
+		temperature_is_alerted[pos] = temperature_is_alerted[pos + 1];
+	}
+
+	dht22_cont--;
+
+	dht22_gpios_array = (dht22_gpios_t*) realloc(dht22_gpios_array, sizeof(dht22_gpios_t) * dht22_cont);
+	dht22_data_array = (dht22_data_t*) realloc(dht22_data_array, sizeof(dht22_data_t) * dht22_cont);
+
+	humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
+	humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
+
+	temperature_alert_counter = (int*) realloc(temperature_alert_counter, sizeof(int) * dht22_cont);
+	temperature_is_alerted = (bool*) realloc(temperature_is_alerted, sizeof(bool) * dht22_cont);
+
+	nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
+	nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
+
+	pthread_mutex_unlock(&mutex_dht22);
+
+	ESP_LOGI(TAG, "Sensor deleted");
+
+	return 1;
+}
+
+int dht22_set_gpios(int pos, int* gpios, char* reason){
+	if(!g_dht22_initialized){
+		ESP_LOGE(TAG, "DHT22 not initialized");
+		sprintf(reason, "DHT22 not initialized");
+
 		return -1;
 	}
 
-	if(!gpios_manager_is_free(gpios[0])){
-		pthread_mutex_unlock(&mutex_dht22);
+	if(!check_valid_pos(pos)){
+		ESP_LOGE(TAG, "Position not valid");
+		sprintf(reason, "Position not valid");
 
-		ESP_LOGE(TAG, "Error, the GPIO selected is not available");
 		return -1;
 	}
 
-	gpios_manager_lock(gpios, DHT22_N_GPIOS);
+	if(gpios_manager_lock_gpios(gpios, DHT22_N_GPIOS, reason) == -1)
+		return -1;
 
-	gpios_manager_free(&dht22_gpios_array[pos].data, DHT22_N_GPIOS);
+	if(!check_free_gpios(pos, reason))
+		return -1;
+
+	pthread_mutex_lock(&mutex_dht22);
 
 	dht22_gpios_array[pos].data = gpios[0];
 
@@ -496,46 +514,56 @@ int dht22_set_gpios(int pos, int* gpios){
 	return 1;
 }
 
-int dht22_set_parameters(int pos, union sensor_value_u* parameters){
+int dht22_set_parameters(int pos, union sensor_value_u* parameters, char* reason){
+	sprintf(reason, "DHT22 doesn't have parameters");
 	return -1;
 }
 
-int dht22_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold){
-
+int dht22_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold, char* reason){
 	if(!g_dht22_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
+		ESP_LOGE(TAG, "DHT22 not initialized");
+		sprintf(reason, "DHT22 not initialized");
+
 		return -1;
 	}
 
 	if(value < 0 || value > 1){
-		ESP_LOGE(TAG, "Error, the value doesn't exist");
+		ESP_LOGE(TAG, "Value doesn't exist");
+		sprintf(reason, "Value doesn't exist");
+
 		return -1;
 	}
 
 	if(n_ticks <= 0){
-		ESP_LOGE(TAG, "Error, the number of ticks can't be 0 or less than 0");
+		ESP_LOGE(TAG, "Ticks must be greater than 0");
+		sprintf(reason, "Ticks must be greater than 0");
+
 		return -1;
 	}
 
 	if(upper_threshold.fval <= lower_threshold.fval){
-		ESP_LOGE(TAG, "Error, the thresholds don't make sense, upper is smaller than lower");
+		ESP_LOGE(TAG, "Upper threshold should be greater than lower");
+		sprintf(reason, "Upper threshold should be greater than lower");
+
 		return -1;
 	}
 
 	pthread_mutex_lock(&mutex_dht22);
 
 	if(value == 0){ // Humidity
-		dht22_alert_humidity = alert;
-		dht22_humidity_ticks_to_alert = n_ticks;
-		dht22_humidity_upper_threshold = upper_threshold.fval;
-		dht22_humidity_lower_threshold = lower_threshold.fval;
+		dht22_alerts.humidity_alert = alert;
+		dht22_alerts.humidity_ticks_to_alert = n_ticks;
+		dht22_alerts.humidity_upper_threshold = upper_threshold.fval;
+		dht22_alerts.humidity_lower_threshold = lower_threshold.fval;
 	}
 	else{ // Temperature
-		dht22_alert_temperature = alert;
-		dht22_temperature_ticks_to_alert = n_ticks;
-		dht22_temperature_upper_threshold = upper_threshold.fval;
-		dht22_temperature_lower_threshold = lower_threshold.fval;
+		dht22_alerts.temperature_alert = alert;
+		dht22_alerts.temperature_ticks_to_alert = n_ticks;
+		dht22_alerts.temperature_upper_threshold = upper_threshold.fval;
+		dht22_alerts.temperature_lower_threshold = lower_threshold.fval;
 	}
+
+	nvs_app_set_blob_value(nvs_DHT22_ALERTS_key,&dht22_alerts,sizeof(dht22_alerts_t));
 
 	pthread_mutex_unlock(&mutex_dht22);
 
@@ -547,49 +575,71 @@ sensor_data_t* dht22_get_sensors_data(int* number_of_sensors){
 	*number_of_sensors = 0;
 
 	if(!g_dht22_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
+		ESP_LOGE(TAG, "DHT22 not initialized");
+
 		return NULL;
 	}
 
 	pthread_mutex_lock(&mutex_dht22);
 
+	sensor_data_t* aux;
+	sensor_value_t* aux2;
+
 	if(dht22_cont == 0){
-		pthread_mutex_unlock(&mutex_dht22);
+		aux = (sensor_data_t*) malloc(sizeof(sensor_data_t));
+		aux2 = (sensor_value_t*) malloc(sizeof(sensor_value_t) * DHT22_N_VALUES);
 
-		ESP_LOGI(TAG, "There is no sensors of this type");
-		return NULL;
+		strcpy(aux[0].sensorName, "DHT22");
+		aux[0].valuesLen = DHT22_N_VALUES;
+		aux[0].sensor_values = aux2;
+
+		aux[0].sensor_values[0].showOnLCD = DHT22_SHOW_HUMIDITY_ON_LCD;
+		strcpy(aux[0].sensor_values[0].valueName,"Humidity");
+		aux[0].sensor_values[0].sensor_value_type = FLOAT;
+		aux[0].sensor_values[0].alert = dht22_alerts.humidity_alert;
+		aux[0].sensor_values[0].ticks_to_alert = dht22_alerts.humidity_ticks_to_alert;
+		aux[0].sensor_values[0].upper_threshold.fval = dht22_alerts.humidity_upper_threshold;
+		aux[0].sensor_values[0].lower_threshold.fval = dht22_alerts.humidity_lower_threshold;
+
+		aux[0].sensor_values[1].showOnLCD = DHT22_SHOW_TEMPERATURE_ON_LCD;
+		strcpy(aux[0].sensor_values[1].valueName,"Temperature");
+		aux[0].sensor_values[1].sensor_value_type = FLOAT;
+		aux[0].sensor_values[1].alert = dht22_alerts.temperature_alert;
+		aux[0].sensor_values[1].ticks_to_alert = dht22_alerts.temperature_ticks_to_alert;
+		aux[0].sensor_values[1].upper_threshold.fval = dht22_alerts.temperature_upper_threshold;
+		aux[0].sensor_values[1].lower_threshold.fval = dht22_alerts.temperature_lower_threshold;
 	}
+	else{
+		*number_of_sensors = dht22_cont;
 
-	*number_of_sensors = dht22_cont;
+		aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * dht22_cont);
 
-	sensor_data_t* aux = (sensor_data_t*) malloc(sizeof(sensor_data_t) * dht22_cont);
-	sensor_value_t *aux2;
+		for(int i = 0; i < dht22_cont; i++){
 
-	for(int i = 0; i < dht22_cont; i++){
+			aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * DHT22_N_VALUES);
 
-		aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * DHT22_N_VALUES);
+			strcpy(aux[i].sensorName, "DHT22");
+			aux[i].valuesLen = DHT22_N_VALUES;
+			aux[i].sensor_values = aux2;
 
-		strcpy(aux[i].sensorName, "DHT22");
-		aux[i].valuesLen = DHT22_N_VALUES;
-		aux[i].sensor_values = aux2;
+			aux[i].sensor_values[0].showOnLCD = DHT22_SHOW_HUMIDITY_ON_LCD;
+			strcpy(aux[i].sensor_values[0].valueName,"Humidity");
+			aux[i].sensor_values[0].sensor_value_type = FLOAT;
+			aux[i].sensor_values[0].sensor_value.fval = dht22_data_array[i].humidity;
+			aux[i].sensor_values[0].alert = dht22_alerts.humidity_alert;
+			aux[i].sensor_values[0].ticks_to_alert = dht22_alerts.humidity_ticks_to_alert;
+			aux[i].sensor_values[0].upper_threshold.fval = dht22_alerts.humidity_upper_threshold;
+			aux[i].sensor_values[0].lower_threshold.fval = dht22_alerts.humidity_lower_threshold;
 
-		aux[i].sensor_values[0].showOnLCD = DHT22_SHOW_HUMIDITY_ON_LCD;
-		strcpy(aux[i].sensor_values[0].valueName,"Humidity");
-		aux[i].sensor_values[0].sensor_value_type = FLOAT;
-		aux[i].sensor_values[0].sensor_value.fval = dht22_data_array[i].humidity;
-		aux[i].sensor_values[0].alert = dht22_alert_humidity;
-		aux[i].sensor_values[0].ticks_to_alert = dht22_humidity_ticks_to_alert;
-		aux[i].sensor_values[0].upper_threshold.fval = dht22_humidity_upper_threshold;
-		aux[i].sensor_values[0].lower_threshold.fval = dht22_humidity_lower_threshold;
-
-		aux[i].sensor_values[1].showOnLCD = DHT22_SHOW_TEMPERATURE_ON_LCD;
-		strcpy(aux[i].sensor_values[1].valueName,"Temperature");
-		aux[i].sensor_values[1].sensor_value_type = FLOAT;
-		aux[i].sensor_values[1].sensor_value.fval = dht22_data_array[i].temperature;
-		aux[i].sensor_values[1].alert = dht22_alert_temperature;
-		aux[i].sensor_values[1].ticks_to_alert = dht22_temperature_ticks_to_alert;
-		aux[i].sensor_values[1].upper_threshold.fval = dht22_temperature_upper_threshold;
-		aux[i].sensor_values[1].lower_threshold.fval = dht22_temperature_lower_threshold;
+			aux[i].sensor_values[1].showOnLCD = DHT22_SHOW_TEMPERATURE_ON_LCD;
+			strcpy(aux[i].sensor_values[1].valueName,"Temperature");
+			aux[i].sensor_values[1].sensor_value_type = FLOAT;
+			aux[i].sensor_values[1].sensor_value.fval = dht22_data_array[i].temperature;
+			aux[i].sensor_values[1].alert = dht22_alerts.temperature_alert;
+			aux[i].sensor_values[1].ticks_to_alert = dht22_alerts.temperature_ticks_to_alert;
+			aux[i].sensor_values[1].upper_threshold.fval = dht22_alerts.temperature_upper_threshold;
+			aux[i].sensor_values[1].lower_threshold.fval = dht22_alerts.temperature_lower_threshold;
+		}
 	}
 
 	pthread_mutex_unlock(&mutex_dht22);
@@ -602,33 +652,40 @@ sensor_gpios_info_t* dht22_get_sensors_gpios(int* number_of_sensors){
 	*number_of_sensors = 0;
 
 	if(!g_dht22_initialized){
-		ESP_LOGE(TAG, "Error, you can't operate with the DHT22 without initializing it");
+		ESP_LOGE(TAG, "DHT22 not initialized");
+
 		return NULL;
 	}
 
 	pthread_mutex_lock(&mutex_dht22);
 
+	sensor_gpios_info_t* aux;
+	sensor_gpio_t* aux2;
+
 	if(dht22_cont == 0){
-		pthread_mutex_unlock(&mutex_dht22);
-
-		ESP_LOGI(TAG, "There is no sensors of this type");
-		return NULL;
-	}
-
-	*number_of_sensors = dht22_cont;
-
-	sensor_gpios_info_t* aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * dht22_cont);
-	sensor_gpio_t *aux2;
-
-	for(int i = 0; i < dht22_cont; i++){
-
+		aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t));
 		aux2 = (sensor_gpio_t *)malloc(sizeof(sensor_gpio_t) * DHT22_N_GPIOS);
 
-		aux[i].gpiosLen = DHT22_N_GPIOS;
-		aux[i].sensor_gpios = aux2;
+		aux[0].gpiosLen= DHT22_N_GPIOS;
+		aux[0].sensor_gpios = aux2;
 
-		strcpy(aux[i].sensor_gpios[0].gpioName,"Data");
-		aux[i].sensor_gpios[0].sensor_gpio = dht22_gpios_array[i].data;
+		strcpy(aux[0].sensor_gpios[0].gpioName,"Data");
+	}
+	else{
+		*number_of_sensors = dht22_cont;
+
+		aux = (sensor_gpios_info_t*) malloc(sizeof(sensor_gpios_info_t) * dht22_cont);
+
+		for(int i = 0; i < dht22_cont; i++){
+
+			aux2 = (sensor_gpio_t *)malloc(sizeof(sensor_gpio_t) * DHT22_N_GPIOS);
+
+			aux[i].gpiosLen = DHT22_N_GPIOS;
+			aux[i].sensor_gpios = aux2;
+
+			strcpy(aux[i].sensor_gpios[0].gpioName,"Data");
+			aux[i].sensor_gpios[0].sensor_gpio = dht22_gpios_array[i].data;
+		}
 	}
 
 	pthread_mutex_unlock(&mutex_dht22);
@@ -637,5 +694,6 @@ sensor_gpios_info_t* dht22_get_sensors_gpios(int* number_of_sensors){
 }
 
 sensor_additional_parameters_info_t* dht22_get_sensors_additional_parameters(int* number_of_sensors){
+	*number_of_sensors = 0;
 	return NULL;
 }
