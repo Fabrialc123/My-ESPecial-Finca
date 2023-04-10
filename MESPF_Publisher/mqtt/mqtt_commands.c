@@ -21,13 +21,13 @@ static const char TAG2[] = "MQTT_COMMANDS";
 
 void mqtt_app_scan_command(char* src);
 void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data);
+void mqtt_app_getconf_command (char *sensor_name,int sensor_unit,char *data);
 void mqtt_app_send_resp(char *src, int id, int resp);
 
 void mqtt_app_process_command(char* topic,char* data){
 	int aux, tl, sensor_unit, i;
 	char sensor_name[CHAR_LENGTH];
 	char delimiter[] = "/";
-	char *token;
 
 	tl = strlen(topic);
 
@@ -44,13 +44,23 @@ void mqtt_app_process_command(char* topic,char* data){
 	}else if(tl >= (aux=strlen(SET_TOPIC)) && strncmp(&topic[tl - aux],SET_TOPIC,aux) == 0){
 		ESP_LOGI(TAG2,"Received a SET request (%s)",data);
 
-		token = strtok(topic,delimiter);
-		for(i = 0; i < 2; i++) token = strtok(NULL,delimiter);
+		strtok(topic,delimiter);
+		for(i = 0; i < 2; i++) strtok(NULL,delimiter);
 
 	    strncpy(sensor_name, strtok(NULL,delimiter),CHAR_LENGTH);
-	    sensor_unit = atoi(strtok(NULL,delimiter));
+	    sensor_unit = atoi(strtok(NULL,delimiter)) - 1;
 
 		mqtt_app_set_command (sensor_name,sensor_unit,data);
+	}else if(tl >= (aux=strlen(GETCONF_TOPIC)) && strncmp(&topic[tl - aux],GETCONF_TOPIC,aux) == 0){
+		ESP_LOGI(TAG2,"Received a GETCONF request (%s)",data);
+
+		strtok(topic,delimiter);
+		for(i = 0; i < 2; i++) strtok(NULL,delimiter);
+
+	    strncpy(sensor_name, strtok(NULL,delimiter),CHAR_LENGTH);
+	    sensor_unit = atoi(strtok(NULL,delimiter)) - 1;
+
+		mqtt_app_getconf_command (sensor_name,sensor_unit,data);
 	}
 	else{
 		ESP_LOGE(TAG2, "mqtt_app_process_command: NOT SUPPORTED COMMAND %s",topic);
@@ -302,7 +312,8 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 	}
 
 	resp = -108;
-	if (num_sensors == 0 || num_sensors <= sensor_unit || sensor_unit <= 0){
+	ESP_LOGE(TAG2,"mqtt_app_process_set_command, num_sensors: %d",num_sensors);
+	if (num_sensors == 0 || num_sensors <= sensor_unit || sensor_unit < 0){
 		ESP_LOGE(TAG2, "mqtt_app_process_set_command, Invalid sensor_unit (%d) for sensor_id (%d)", sensor_unit,sensor_id);
 
 		cJSON_Delete(jobj);
@@ -330,7 +341,8 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 					strcpy(sensor_value[0].cval, arg4);
 					strcpy(sensor_value[1].cval, arg5);
 				}
-				resp = sensors_manager_set_alert_values(sensor_id,value,enable,ticks, sensor_value[0], sensor_value[1], reason);
+				ESP_LOGE(TAG2,"mqtt_app_set_command, sensor_id: %d", sensor_id);
+				resp = sensors_manager_set_alert_values(sensor_id - 1,value,enable,ticks, sensor_value[0], sensor_value[1], reason);
 			}
 			else {
 				resp = -109;
@@ -343,7 +355,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 			gpios[2] = atoi(arg3);
 			gpios[3] = atoi(arg4);
 			gpios[4] = atoi(arg5);
-			resp = sensors_manager_set_gpios(sensor_id, sensor_unit,gpios,reason);
+			resp = sensors_manager_set_gpios(sensor_id - 1, sensor_unit,gpios,reason);
 			break;
 
 		case 2:
@@ -352,9 +364,9 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 				ESP_LOGE(TAG2, "mqtt_app_process_set_command, SENSOR_PARAMETERS NOT FOUND (%d)", sensor_id);
 				resp = -110;
 			}
-			else if (num_sensors == 0 || num_sensors <= sensor_unit || sensor_unit <= 0){
-				ESP_LOGE(TAG2, "mqtt_app_process_set_command, Invalid sensor_unit (%d) for sensor_id (%d)", sensor_unit,sensor_id);
-				resp = -108;
+			else if (num_sensors == 0 || num_sensors <= sensor_unit || sensor_unit < 0){
+				ESP_LOGE(TAG2, "mqtt_app_process_set_command, Invalid sensor_unit (%d) for sensor_id (%d) in GET_SENSOR_PARAMETERS", sensor_unit,sensor_id);
+				resp = -111;
 			}
 			else{
 				for(i = 0; i < sensor_parameters[0].parametersLen; i++){
@@ -371,7 +383,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 					}else
 						strcpy(sensor_value[i].cval, auxC);
 				}
-				resp = sensors_manager_set_parameters(sensor_id, sensor_unit, sensor_value, reason);
+				resp = sensors_manager_set_parameters(sensor_id - 1, sensor_unit, sensor_value, reason);
 			}
 
 			if (num_sensors > 0) {
@@ -391,11 +403,78 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 	mqtt_app_send_resp(src,id,resp);
 }
 
+void mqtt_app_getconf_command(char *sensor_name,int sensor_unit,char *data){
+	struct cJSON *jobj, *aux;
+	char topic[MQTT_APP_MAX_TOPIC_LENGTH],src[SET_COMMAND_SRC], *conf;
+	int sensor_id,num_sensors, i, id, resp;
+	sensor_gpios_info_t *gpios_info;
+	sensor_additional_parameters_info_t *parameters_info;
+	sensor_data_t *data_info;
+
+	jobj = cJSON_Parse(data);
+
+	resp = -1;
+
+	if (!cJSON_HasObjectItem(jobj,"USER")){
+		ESP_LOGE(TAG2, "mqtt_app_getconf_command, USER not defined!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	aux = cJSON_GetObjectItem(jobj,"USER");
+	if(!cJSON_IsString(aux) || (strlen(cJSON_GetStringValue(aux)) >= SET_COMMAND_SRC)){
+		ESP_LOGE(TAG2, "mqtt_app_getconf_command, USER is not STRING or too long!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	strcpy(src, cJSON_GetStringValue(aux));
+
+
+	if (!cJSON_HasObjectItem(jobj,"ID")){
+		ESP_LOGE(TAG2, "mqtt_app_getconf_command, ID not defined!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	aux = cJSON_GetObjectItem(jobj,"ID");
+	if(!cJSON_IsNumber(aux)){
+		ESP_LOGE(TAG2, "mqtt_app_getconf_command, ID is not NUMBER!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	id = (int)cJSON_GetNumberValue(aux);
+
+	free(jobj);
+
+	jobj = cJSON_CreateObject();
+
+	cJSON_AddNumberToObject(jobj,"ID",id);
+	cJSON_AddNumberToObject(jobj,"RES",atoi(resp));
+
+	sensor_id = get_sensor_id_by_name(sensor_name);
+	data_info = get_sensor_data (sensor_id, &num_sensors);
+	if (num_sensors > 0 && sensor_unit >= 0 && num_sensors > sensor_unit){
+		for(i = 0; i < data_info[sensor_unit].valuesLen ; i++){
+
+		}
+	}
+
+
+
+
+
+	conf = cJSON_Print(jobj);
+
+	memset(topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
+	concatenate_topic(USERS_TOPIC, data,RESP_TOPIC,NULL,NULL,NULL,NULL ,topic);
+
+	mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, topic, conf);
+
+	free(resp);
+}
 
 void mqtt_app_send_resp(char *src, int id, int resp){
-	char data[MQTT_APP_MAX_DATA_LENGTH];
+	char *data; //[MQTT_APP_MAX_DATA_LENGTH];
 	char topic[MQTT_APP_MAX_TOPIC_LENGTH];
-	char *aux;
+	//char *aux;
 	struct cJSON *jobj;
 
 	jobj = cJSON_CreateObject();
@@ -403,7 +482,7 @@ void mqtt_app_send_resp(char *src, int id, int resp){
 	cJSON_AddNumberToObject(jobj,"ID",id);
 	cJSON_AddNumberToObject(jobj,"RES",resp);
 
-	aux = cJSON_Print(jobj);
+	data = cJSON_Print(jobj);
 
 	memset(topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
 	concatenate_topic(USERS_TOPIC, src,RESP_TOPIC,NULL,NULL,NULL,NULL ,topic);
@@ -411,7 +490,7 @@ void mqtt_app_send_resp(char *src, int id, int resp){
 	ESP_LOGI(TAG2,"mqtt_app_send_resp, sending RESP: %d to SRC: %s with ID: %d",resp,src,id);
 	mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, topic, data);
 
-	free(aux);
+	free(data);
 }
 
 
