@@ -158,6 +158,7 @@ cuando sólo hay 1 instalado.
 - -109 (OPT 0): Se ha intentado modificar un número de valor que no existe en el TIPO de sensor. Por ejemplo, intentar modificar el valor 3 del HC-RS04, cuando este solo
 tiene 1
 - -110 (OPT 2): No se ha encontrado una configuración de parámetros. Por ejemplo, si se intenta modificar algún parámetro del MQ2, cuando este tipo de sensor no usa parámetros
+- -111 (OPT 2): El número de sensor a modificar no se encuentra entre los instalados con el GET_PARAMETERS.
 - -404: Tipo de operación no disponible.
 - -1: Error genérico del driver del sensor
 
