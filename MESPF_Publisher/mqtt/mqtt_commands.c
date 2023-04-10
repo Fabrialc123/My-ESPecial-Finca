@@ -136,7 +136,7 @@ void mqtt_app_send_alert(char* sensor_name, int id, char* dt){
 
 void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 	struct cJSON *jobj, *aux;
-	char src[SET_COMMAND_SRC], arg1[CHAR_LENGTH], arg2[CHAR_LENGTH],arg3[CHAR_LENGTH],arg4[CHAR_LENGTH], arg5[CHAR_LENGTH], auxC[CHAR_LENGTH];
+	char src[SET_COMMAND_SRC], arg1[CHAR_LENGTH], arg2[CHAR_LENGTH],arg3[CHAR_LENGTH],arg4[CHAR_LENGTH], arg5[CHAR_LENGTH], auxC[CHAR_LENGTH], reason[50];
 	int id, opt, resp, sensor_id, num_sensors, i;
 	int value, ticks;
 	bool enable;
@@ -282,7 +282,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 
 
 	resp = -106;
-	sensor_id = sensors_manager_get_sensor_id_by_name(sensor_name);
+	sensor_id = get_sensor_id_by_name(sensor_name);
 	if (sensor_id < 1){
 		ESP_LOGE(TAG2, "mqtt_app_process_set_command, sensor_id not found!");
 		cJSON_Delete(jobj);
@@ -330,7 +330,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 					strcpy(sensor_value[0].cval, arg4);
 					strcpy(sensor_value[1].cval, arg5);
 				}
-				resp = sensors_manager_set_alert_values(sensor_id,value,enable,ticks, sensor_value[0], sensor_value[1]);
+				resp = sensors_manager_set_alert_values(sensor_id,value,enable,ticks, sensor_value[0], sensor_value[1], reason);
 			}
 			else {
 				resp = -109;
@@ -343,7 +343,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 			gpios[2] = atoi(arg3);
 			gpios[3] = atoi(arg4);
 			gpios[4] = atoi(arg5);
-			resp = sensors_manager_set_gpios(sensor_id, sensor_unit,gpios);
+			resp = sensors_manager_set_gpios(sensor_id, sensor_unit,gpios,reason);
 			break;
 
 		case 2:
@@ -371,7 +371,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 					}else
 						strcpy(sensor_value[i].cval, auxC);
 				}
-				resp = sensors_manager_set_parameters(sensor_id, sensor_unit, sensor_value);
+				resp = sensors_manager_set_parameters(sensor_id, sensor_unit, sensor_value, reason);
 			}
 
 			if (num_sensors > 0) {
