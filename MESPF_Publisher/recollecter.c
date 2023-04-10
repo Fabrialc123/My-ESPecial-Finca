@@ -76,497 +76,326 @@ pthread_mutex_unlock(&mutex_RECOLLECTER);
 	return size;
 }
 
-void get_sensors_json(char *data){
-
-	int number_of_sensors;
+void get_sensors_configuration_cjson(char *data){
+	int number_of_sensors, cont = get_recollecters_size(), n_free;
 	sensor_data_t* sensor_data;
 	sensor_gpios_info_t* sensor_gpios;
 	sensor_additional_parameters_info_t* sensor_parameters;
-	bool first = true;
+	cJSON *jobj, *sensorjobj, *sensorsArray, *auxArray;
 
-	char aux[CHAR_LENGTH];
+	jobj = cJSON_CreateObject();
 
-	strcpy(data, "{\"nSensors\":");
+	cJSON_AddNumberToObject(jobj, "nSensors", cont);
+	sensorsArray = cJSON_AddArrayToObject(jobj, "sensors");
 
-	memset(&aux, 0, CHAR_LENGTH);
-	sprintf(aux, "%d", recollecters_n);
-	strcat(data, aux);
+	for(int i = 0; i < cont; i++){
 
-	strcat(data, ",\"sensors\":[");
-
-	for(int i = 0; i < recollecters_n; i++){
+		sensorjobj = cJSON_CreateObject();
 
 		sensor_data = get_sensor_data(i, &number_of_sensors);
-		sensor_gpios = get_sensor_gpios(i, &number_of_sensors);
-		sensor_parameters = get_sensor_parameters(i, &number_of_sensors);
 
 		if(sensor_data != NULL){
 
-			if(!first){
-				strcat(data, ",");
-			}
-
-			strcat(data, "{\"sensorName\":\"");
-			strcat(data, sensor_data[0].sensorName);
-			strcat(data, "\"");
-
-			strcat(data, ",\"numberOfUnits\":");
-			memset(&aux, 0, CHAR_LENGTH);
-			sprintf(aux, "%d", number_of_sensors);
-			strcat(data, aux);
-
-			strcat(data, ",\"numberOfGpios\":");
-
-			if(sensor_gpios != NULL){
-				memset(&aux, 0, CHAR_LENGTH);
-				sprintf(aux, "%d", sensor_gpios[0].gpiosLen);
-				strcat(data, aux);
-
-				strcat(data, ",\"gpioNames\":[");
-				for(int j = 0; j < sensor_gpios[0].gpiosLen; j++){
-					strcat(data, "\"");
-					strcat(data, sensor_gpios[0].sensor_gpios[j].gpioName);
-					strcat(data, "\"");
-
-					if(j < sensor_gpios[0].gpiosLen - 1){
-						strcat(data, ",");
-					}
-				}
-				strcat(data, "]");
-			}
-			else{
-				memset(&aux, 0, CHAR_LENGTH);
-				sprintf(aux, "%d", 0);
-				strcat(data, aux);
-
-				strcat(data, ",\"gpioNames\":null");
-			}
-
-			strcat(data, ",\"numberOfValues\":");
-			memset(&aux, 0, CHAR_LENGTH);
-			sprintf(aux, "%d", sensor_data[0].valuesLen);
-			strcat(data, aux);
-
-			strcat(data, ",\"valueNames\":[");
+			// Fill with sensor data information
+			cJSON_AddStringToObject(sensorjobj, "sensorName", sensor_data[0].sensorName);
+			cJSON_AddNumberToObject(sensorjobj, "numberOfUnits", number_of_sensors);
+			cJSON_AddNumberToObject(sensorjobj, "numberOfValues", sensor_data[0].valuesLen);
+			auxArray = cJSON_AddArrayToObject(sensorjobj, "valueNames");
 			for(int j = 0; j < sensor_data[0].valuesLen; j++){
-				strcat(data, "\"");
-				strcat(data, sensor_data[0].sensor_values[j].valueName);
-				strcat(data, "\"");
-
-				if(j < sensor_data[0].valuesLen - 1){
-					strcat(data, ",");
-				}
+				cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_data[0].sensor_values[j].valueName));
 			}
-			strcat(data, "]");
-
-			strcat(data, ",\"valueTypes\":[");
+			auxArray = cJSON_AddArrayToObject(sensorjobj, "valueTypes");
 			for(int j = 0; j < sensor_data[0].valuesLen; j++){
-				strcat(data, "\"");
-
 				if(sensor_data[0].sensor_values[j].sensor_value_type == INTEGER)
-					strcat(data, "INTEGER");
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString("INTEGER"));
 				else if(sensor_data[0].sensor_values[j].sensor_value_type == FLOAT)
-					strcat(data, "FLOAT");
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString("FLOAT"));
 				else
-					strcat(data, "STRING");
-
-				strcat(data, "\"");
-
-				if(j < sensor_data[0].valuesLen - 1){
-					strcat(data, ",");
-				}
-			}
-			strcat(data, "]");
-
-			strcat(data, ",\"numberOfParameters\":");
-
-			if(sensor_parameters != NULL){
-				memset(&aux, 0, CHAR_LENGTH);
-				sprintf(aux, "%d", sensor_parameters[0].parametersLen);
-				strcat(data, aux);
-
-				strcat(data, ",\"parameterNames\":[");
-				for(int j = 0; j < sensor_parameters[0].parametersLen; j++){
-					strcat(data, "\"");
-					strcat(data, sensor_parameters[0].sensor_parameters[j].parameterName);
-					strcat(data, "\"");
-
-					if(j < sensor_parameters[0].parametersLen - 1){
-						strcat(data, ",");
-					}
-				}
-				strcat(data, "]");
-
-				strcat(data, ",\"parameterTypes\":[");
-				for(int j = 0; j < sensor_parameters[0].parametersLen; j++){
-					strcat(data, "\"");
-
-					if(sensor_parameters[0].sensor_parameters[j].sensor_parameter_type == INTEGER)
-						strcat(data, "INTEGER");
-					else if(sensor_parameters[0].sensor_parameters[j].sensor_parameter_type == FLOAT)
-						strcat(data, "FLOAT");
-					else
-						strcat(data, "STRING");
-
-					strcat(data, "\"");
-
-					if(j < sensor_parameters[0].parametersLen - 1){
-						strcat(data, ",");
-					}
-				}
-				strcat(data, "]");
-			}
-			else{
-				memset(&aux, 0, CHAR_LENGTH);
-				sprintf(aux, "%d", 0);
-				strcat(data, aux);
-
-				strcat(data, ",\"parameterNames\":null");
-				strcat(data, ",\"parameterTypes\":null");
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString("STRING"));
 			}
 
-			strcat(data, "}");
+			// Free sensor data pointers
+			n_free = 0;
 
-			if(first)
-				first = false;
-		}
-
-		// Free memory
-		if(sensor_data != NULL){
-			for(int j = 0; j < number_of_sensors; j++){
-				free(sensor_data[j].sensor_values);
-			}
+			do{
+				free(sensor_data[n_free].sensor_values);
+				n_free++;
+			}while (n_free < number_of_sensors);
 			free(sensor_data);
 		}
+		else{
+			cJSON_AddNullToObject(sensorjobj, "sensorName");
+			cJSON_AddNullToObject(sensorjobj, "numberOfUnits");
+			cJSON_AddNullToObject(sensorjobj, "numberOfValues");
+			cJSON_AddNullToObject(sensorjobj, "valueNames");
+			cJSON_AddNullToObject(sensorjobj, "valueTypes");
+		}
+
+		sensor_gpios = get_sensor_gpios(i, &number_of_sensors);
+
 		if(sensor_gpios != NULL){
-			for(int j = 0; j < number_of_sensors; j++){
-				free(sensor_gpios[j].sensor_gpios);
+
+			// Fill with sensor GPIOS information
+			cJSON_AddNumberToObject(sensorjobj, "numberOfGpios", sensor_gpios[0].gpiosLen);
+			auxArray = cJSON_AddArrayToObject(sensorjobj, "gpioNames");
+			for(int j = 0; j < sensor_gpios[0].gpiosLen; j++){
+				cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_gpios[0].sensor_gpios[j].gpioName));
 			}
+
+			// Free sensor GPIOS pointers
+			n_free = 0;
+
+			do{
+				free(sensor_gpios[n_free].sensor_gpios);
+				n_free++;
+			}while(n_free < number_of_sensors);
 			free(sensor_gpios);
 		}
+		else{
+			cJSON_AddNullToObject(sensorjobj, "numberOfGpios");
+			cJSON_AddNullToObject(sensorjobj, "gpioNames");
+		}
+
+		sensor_parameters = get_sensor_parameters(i, &number_of_sensors);
+
 		if(sensor_parameters != NULL){
-			for(int j = 0; j < number_of_sensors; j++){
-				free(sensor_parameters[j].sensor_parameters);
+
+			// Fill with sensor parameters information
+			cJSON_AddNumberToObject(sensorjobj, "numberOfParameters", sensor_parameters[0].parametersLen);
+			auxArray = cJSON_AddArrayToObject(sensorjobj, "parameterNames");
+			for(int j = 0; j < sensor_parameters[0].parametersLen; j++){
+				cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_parameters[0].sensor_parameters[j].parameterName));
 			}
+			auxArray = cJSON_AddArrayToObject(sensorjobj, "parameterTypes");
+			for(int j = 0; j < sensor_parameters[0].parametersLen; j++){
+				if(sensor_parameters[0].sensor_parameters[j].sensor_parameter_type == INTEGER)
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString("INTEGER"));
+				else if(sensor_parameters[0].sensor_parameters[j].sensor_parameter_type == FLOAT)
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString("FLOAT"));
+				else
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString("STRING"));
+			}
+
+			// Free sensor parameters pointers
+			n_free = 0;
+
+			do{
+				free(sensor_parameters[n_free].sensor_parameters);
+				n_free++;
+			}while(n_free < number_of_sensors);
 			free(sensor_parameters);
 		}
+		else{
+			cJSON_AddNullToObject(sensorjobj, "numberOfParameters");
+			cJSON_AddNullToObject(sensorjobj, "parameterNames");
+			cJSON_AddNullToObject(sensorjobj, "parameterTypes");
+		}
+
+		cJSON_AddItemToArray(sensorsArray, sensorjobj);
 	}
 
-	strcat(data, "]}");
+	strcpy(data, cJSON_Print(jobj));
+	cJSON_Delete(jobj);
 }
 
-void get_sensors_values_json(char *data){
-
-	int number_of_sensors;
-	sensor_data_t* sensor_data;
-	bool first = true;
-
+void get_sensors_values_cjson(char *data){
 	char aux[CHAR_LENGTH];
+	int number_of_sensors, cont = get_recollecters_size();
+	sensor_data_t* sensor_data;
+	cJSON *jobj, *sensorArray, *auxArray;
 
-	strcpy(data, "{");
+	jobj = cJSON_CreateObject();
 
-	for(int i = 0; i < recollecters_n; i++){
+	for(int i = 0; i < cont; i++){
 
 		sensor_data = get_sensor_data(i, &number_of_sensors);
 
-		if(sensor_data != NULL){
+		itoa(i, aux, 10);
 
-			if(!first){
-				strcat(data, ",");
-			}
+		if(sensor_data != NULL && number_of_sensors > 0){
 
-			strcat(data, "\"");
-			memset(&aux, 0, CHAR_LENGTH);
-			sprintf(aux, "%d", i);
-			strcat(data, aux);
-			strcat(data, "\":[");
+			sensorArray = cJSON_AddArrayToObject(jobj, aux);
 
 			for(int j = 0; j < number_of_sensors; j++){
-				strcat(data, "[");
+
+				auxArray = cJSON_CreateArray();
 
 				for(int k = 0; k < sensor_data[0].valuesLen; k++){
-					memset(&aux, 0, CHAR_LENGTH);
-					if (sensor_data[j].sensor_values[k].sensor_value_type == INTEGER){
-						sprintf(aux, "%d", sensor_data[j].sensor_values[k].sensor_value.ival);
-					}else if (sensor_data[j].sensor_values[k].sensor_value_type == FLOAT){
-						sprintf(aux, "%f", sensor_data[j].sensor_values[k].sensor_value.fval);
-					}else {
-						strcpy(aux, "\"");
-						strcat(aux, sensor_data[j].sensor_values[k].sensor_value.cval);
-						strcat(aux, "\"");
-					}
-					strcat(data, aux);
-
-					if(k < sensor_data[0].valuesLen - 1){
-						strcat(data, ",");
-					}
+					if(sensor_data[j].sensor_values[k].sensor_value_type == INTEGER)
+						cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[j].sensor_values[k].sensor_value.ival));
+					else if(sensor_data[j].sensor_values[k].sensor_value_type == FLOAT)
+						cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[j].sensor_values[k].sensor_value.fval));
+					else
+						cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_data[j].sensor_values[k].sensor_value.cval));
 				}
 
-				strcat(data, "]");
-
-				if(j < number_of_sensors - 1){
-					strcat(data, ",");
-				}
+				cJSON_AddItemToArray(sensorArray, auxArray);
 			}
 
-			strcat(data, "]");
-
-			if(first)
-				first = false;
-		}
-
-		// Free memory
-		if(sensor_data != NULL){
+			// Free memory
 			for(int j = 0; j < number_of_sensors; j++){
 				free(sensor_data[j].sensor_values);
 			}
 			free(sensor_data);
 		}
+		else{
+			cJSON_AddNullToObject(jobj, aux);
+		}
 	}
 
-	strcat(data, "}");
+	strcpy(data, cJSON_Print(jobj));
+	cJSON_Delete(jobj);
 }
 
-void get_sensors_gpios_json(char *data){
-
-	int number_of_sensors;
-	sensor_gpios_info_t* sensor_gpios;
-	bool first = true;
-
+void get_sensors_gpios_cjson(char *data){
 	char aux[CHAR_LENGTH];
+	int number_of_sensors, cont = get_recollecters_size();
+	sensor_gpios_info_t* sensor_gpios;
+	cJSON *jobj, *sensorArray, *auxArray;
 
-	strcpy(data, "{");
+	jobj = cJSON_CreateObject();
 
-	for(int i = 0; i < recollecters_n; i++){
+	for(int i = 0; i < cont; i++){
 
 		sensor_gpios = get_sensor_gpios(i, &number_of_sensors);
 
-		if(sensor_gpios != NULL){
+		itoa(i, aux, 10);
 
-			if(!first){
-				strcat(data, ",");
-			}
+		if(sensor_gpios != NULL && number_of_sensors > 0){
 
-			strcat(data, "\"");
-			memset(&aux, 0, CHAR_LENGTH);
-			sprintf(aux, "%d", i);
-			strcat(data, aux);
-			strcat(data, "\":[");
+			sensorArray = cJSON_AddArrayToObject(jobj, aux);
 
 			for(int j = 0; j < number_of_sensors; j++){
-				strcat(data, "[");
+
+				auxArray = cJSON_CreateArray();
 
 				for(int k = 0; k < sensor_gpios[0].gpiosLen; k++){
-					memset(&aux, 0, CHAR_LENGTH);
-					sprintf(aux, "%d", sensor_gpios[j].sensor_gpios[k].sensor_gpio);
-					strcat(data, aux);
-
-					if(k < sensor_gpios[0].gpiosLen - 1){
-						strcat(data, ",");
-					}
+					cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_gpios[j].sensor_gpios[k].sensor_gpio));
 				}
 
-				strcat(data, "]");
-
-				if(j < number_of_sensors - 1){
-					strcat(data, ",");
-				}
+				cJSON_AddItemToArray(sensorArray, auxArray);
 			}
 
-			strcat(data, "]");
-
-			if(first)
-				first = false;
-		}
-
-		// Free memory
-		if(sensor_gpios != NULL){
+			// Free memory
 			for(int j = 0; j < number_of_sensors; j++){
 				free(sensor_gpios[j].sensor_gpios);
 			}
 			free(sensor_gpios);
 		}
+		else{
+			cJSON_AddNullToObject(jobj, aux);
+		}
 	}
 
-	strcat(data, "}");
+	strcpy(data, cJSON_Print(jobj));
+	cJSON_Delete(jobj);
 }
 
-void get_sensors_parameters_json(char *data){
-
-	int number_of_sensors;
-	sensor_additional_parameters_info_t* sensor_parameters;
-	bool first = true;
-
+void get_sensors_parameters_cjson(char *data){
 	char aux[CHAR_LENGTH];
+	int number_of_sensors, cont = get_recollecters_size();
+	sensor_additional_parameters_info_t* sensor_parameters;
+	cJSON *jobj, *sensorArray, *auxArray;
 
-	strcpy(data, "{");
+	jobj = cJSON_CreateObject();
 
-	for(int i = 0; i < recollecters_n; i++){
+	for(int i = 0; i < cont; i++){
 
 		sensor_parameters = get_sensor_parameters(i, &number_of_sensors);
 
-		if(sensor_parameters != NULL){
+		itoa(i, aux, 10);
 
-			if(!first){
-				strcat(data, ",");
-			}
+		if(sensor_parameters != NULL && number_of_sensors > 0){
 
-			strcat(data, "\"");
-			memset(&aux, 0, CHAR_LENGTH);
-			sprintf(aux, "%d", i);
-			strcat(data, aux);
-			strcat(data, "\":[");
+			sensorArray = cJSON_AddArrayToObject(jobj, aux);
 
 			for(int j = 0; j < number_of_sensors; j++){
-				strcat(data, "[");
+
+				auxArray = cJSON_CreateArray();
 
 				for(int k = 0; k < sensor_parameters[0].parametersLen; k++){
-					memset(&aux, 0, CHAR_LENGTH);
-					if (sensor_parameters[j].sensor_parameters[k].sensor_parameter_type == INTEGER){
-						sprintf(aux, "%d", sensor_parameters[j].sensor_parameters[k].sensor_parameter.ival);
-					}else if (sensor_parameters[j].sensor_parameters[k].sensor_parameter_type == FLOAT){
-						sprintf(aux, "%f", sensor_parameters[j].sensor_parameters[k].sensor_parameter.fval);
-					}else {
-						strcpy(aux, "\"");
-						strcat(aux, sensor_parameters[j].sensor_parameters[k].sensor_parameter.cval);
-						strcat(aux, "\"");
-					}
-					strcat(data, aux);
-
-					if(k < sensor_parameters[0].parametersLen - 1){
-						strcat(data, ",");
-					}
+					if (sensor_parameters[j].sensor_parameters[k].sensor_parameter_type == INTEGER)
+						cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_parameters[j].sensor_parameters[k].sensor_parameter.ival));
+					else if (sensor_parameters[j].sensor_parameters[k].sensor_parameter_type == FLOAT)
+						cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_parameters[j].sensor_parameters[k].sensor_parameter.fval));
+					else
+						cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_parameters[j].sensor_parameters[k].sensor_parameter.cval));
 				}
 
-				strcat(data, "]");
-
-				if(j < number_of_sensors - 1){
-					strcat(data, ",");
-				}
+				cJSON_AddItemToArray(sensorArray, auxArray);
 			}
 
-			strcat(data, "]");
-
-			if(first)
-				first = false;
-		}
-
-		// Free memory
-		if(sensor_parameters != NULL){
+			// Free memory
 			for(int j = 0; j < number_of_sensors; j++){
 				free(sensor_parameters[j].sensor_parameters);
 			}
 			free(sensor_parameters);
 		}
+		else{
+			cJSON_AddNullToObject(jobj, aux);
+		}
 	}
 
-	strcat(data, "}");
+	strcpy(data, cJSON_Print(jobj));
+	cJSON_Delete(jobj);
 }
 
-void get_sensors_alerts_json(char *data){
-
-	int number_of_sensors;
-	sensor_data_t* sensor_data;
-	bool first = true;
-
+void get_sensors_alerts_cjson(char *data){
 	char aux[CHAR_LENGTH];
+	int number_of_sensors, cont = get_recollecters_size(), n_free;
+	sensor_data_t* sensor_data;
+	cJSON *jobj, *sensorArray, *auxArray;
 
-	strcpy(data, "{");
+	jobj = cJSON_CreateObject();
 
-	for(int i = 0; i < recollecters_n; i++){
+	for(int i = 0; i < cont; i++){
 
 		sensor_data = get_sensor_data(i, &number_of_sensors);
 
+		itoa(i, aux, 10);
+
 		if(sensor_data != NULL){
 
-			if(!first){
-				strcat(data, ",");
-			}
-
-			strcat(data, "\"");
-			memset(&aux, 0, CHAR_LENGTH);
-			sprintf(aux, "%d", i);
-			strcat(data, aux);
-			strcat(data, "\":[");
+			sensorArray = cJSON_AddArrayToObject(jobj, aux);
 
 			for(int j = 0; j < sensor_data[0].valuesLen; j++){
-				strcat(data, "[");
 
-				if(sensor_data[0].sensor_values[j].alert){
-					strcat(data, "true");
-				}
-				else{
-					strcat(data, "false");
-				}
+				auxArray = cJSON_CreateArray();
 
-				strcat(data, ",");
-
-				memset(&aux, 0, CHAR_LENGTH);
-				sprintf(aux, "%d", sensor_data[0].sensor_values[j].ticks_to_alert);
-				strcat(data, aux);
-
-				strcat(data, ",");
-
+				cJSON_AddItemToArray(auxArray, cJSON_CreateBool(sensor_data[0].sensor_values[j].alert));
+				cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[0].sensor_values[j].ticks_to_alert));
 				if(sensor_data[0].sensor_values[j].sensor_value_type == INTEGER){
-					memset(&aux, 0, CHAR_LENGTH);
-					sprintf(aux, "%d", sensor_data[0].sensor_values[j].upper_threshold.ival);
-					strcat(data, aux);
-
-					strcat(data, ",");
-
-					memset(&aux, 0, CHAR_LENGTH);
-					sprintf(aux, "%d", sensor_data[0].sensor_values[j].lower_threshold.ival);
-					strcat(data, aux);
+					cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[0].sensor_values[j].upper_threshold.ival));
+					cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[0].sensor_values[j].lower_threshold.ival));
 				}
 				else if(sensor_data[0].sensor_values[j].sensor_value_type == FLOAT){
-					memset(&aux, 0, CHAR_LENGTH);
-					sprintf(aux, "%f", sensor_data[0].sensor_values[j].upper_threshold.fval);
-					strcat(data, aux);
-
-					strcat(data, ",");
-
-					memset(&aux, 0, CHAR_LENGTH);
-					sprintf(aux, "%f", sensor_data[0].sensor_values[j].lower_threshold.fval);
-					strcat(data, aux);
+					cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[0].sensor_values[j].upper_threshold.fval));
+					cJSON_AddItemToArray(auxArray, cJSON_CreateNumber(sensor_data[0].sensor_values[j].lower_threshold.fval));
 				}
 				else{
-					memset(&aux, 0, CHAR_LENGTH);
-					strcpy(aux, "\"");
-					strcat(aux, sensor_data[0].sensor_values[j].upper_threshold.cval);
-					strcat(aux, "\"");
-					strcat(data, aux);
-
-					strcat(data, ",");
-
-					memset(&aux, 0, CHAR_LENGTH);
-					strcpy(aux, "\"");
-					strcat(aux, sensor_data[0].sensor_values[j].lower_threshold.cval);
-					strcat(aux, "\"");
-					strcat(data, aux);
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_data[0].sensor_values[j].upper_threshold.cval));
+					cJSON_AddItemToArray(auxArray, cJSON_CreateString(sensor_data[0].sensor_values[j].lower_threshold.cval));
 				}
 
-				strcat(data, "]");
-				if(j < sensor_data[0].valuesLen - 1){
-					strcat(data, ",");
-				}
+				cJSON_AddItemToArray(sensorArray, auxArray);
 			}
 
-			strcat(data, "]");
+			// Free memory
+			n_free = 0;
 
-			if(first)
-				first = false;
-		}
-
-		// Free memory
-		if(sensor_data != NULL){
-			for(int j = 0; j < number_of_sensors; j++){
-				free(sensor_data[j].sensor_values);
-			}
+			do{
+				free(sensor_data[n_free].sensor_values);
+				n_free++;
+			}while (n_free < number_of_sensors);
 			free(sensor_data);
+		}
+		else{
+			cJSON_AddNullToObject(jobj, aux);
 		}
 	}
 
-	strcat(data, "}");
+	strcpy(data, cJSON_Print(jobj));
+	cJSON_Delete(jobj);
 }
 
 int get_sensor_data_cjson (int sensor_id, int pos, char* data, char* sensorName){
@@ -609,6 +438,35 @@ int get_sensor_data_cjson (int sensor_id, int pos, char* data, char* sensorName)
 	free(printAux);
 
 	return strlen(data);
+}
+
+int get_sensor_id_by_name(char *sensor_name){
+	bool found = false;
+	int id = 0, cont = get_recollecters_size(), number_of_sensors, n_free;
+	sensor_data_t *sensor_data;
+
+	while(id < cont && !found){
+		sensor_data = get_sensor_data(id, &number_of_sensors);
+
+		if(strcmp(sensor_name, sensor_data[0].sensorName) == 0)
+			found = true;
+		else
+			id++;
+
+		// Free pointers
+		n_free = 0;
+
+		do{
+			free(sensor_data[n_free].sensor_values);
+			n_free++;
+		}while (n_free < number_of_sensors);
+		free(sensor_data);
+	}
+
+	if(!found)
+		id = -1;
+
+	return id;
 }
 
 int get_sensor_data_json (int sensor_id, int pos, char* data, char* sensorName){
