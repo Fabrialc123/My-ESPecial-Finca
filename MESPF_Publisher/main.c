@@ -26,14 +26,14 @@ void app_main(void)
     ESP_LOGI(main_TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
     ESP_LOGI(main_TAG, "[APP] IDF version: %s", esp_get_idf_version());
 
-   wifi_app_start();
+    wifi_app_start();
 	
-   recollecter_start();
-   gpios_manager_init();
+    recollecter_start();
+    gpios_manager_init();
     sensors_manager_init();
 
     status_start();
-    sensors_manager_sensors_startup();
+    sensors_manager_sensors_initialization();
 
     mqtt_app_start();
 
