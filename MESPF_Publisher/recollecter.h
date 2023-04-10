@@ -70,6 +70,8 @@ typedef struct{
 	sensor_additional_parameter_t *sensor_parameters;
 }sensor_additional_parameters_info_t;
 
+// ----------------------------------------------------------------------------------------------------------------------------
+
 typedef sensor_data_t* (*recollecter_function)(int*);
 typedef sensor_gpios_info_t* (*recollecter_gpios_function)(int*);
 typedef sensor_additional_parameters_info_t* (*recollecter_parameters_function)(int*);
@@ -79,14 +81,16 @@ int delete_recollecter (int id);
 
 int get_recollecters_size (void);
 
-void get_sensors_json(char *data);
-void get_sensors_values_json(char *data);
-void get_sensors_gpios_json(char *data);
-void get_sensors_parameters_json(char *data);
-void get_sensors_alerts_json(char *data);
+void get_sensors_configuration_cjson(char *data);
+void get_sensors_values_cjson(char *data);
+void get_sensors_gpios_cjson(char *data);
+void get_sensors_parameters_cjson(char *data);
+void get_sensors_alerts_cjson(char *data);
 
 //int get_sensor_data_json (int sensor_id, int pos, char *data, char *sensorName);
 int get_sensor_data_cjson (int sensor_id, int pos, char *data, char *sensorName);
+
+int get_sensor_id_by_name(char *sensor_name);
 
 //void get_sensor_data_name(int sensor_id, char *name);
 
