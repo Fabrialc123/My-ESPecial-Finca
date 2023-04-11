@@ -405,15 +405,13 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 
 void mqtt_app_getconf_command(char *sensor_name,int sensor_unit,char *data){
 	struct cJSON *jobj, *aux;
-	char topic[MQTT_APP_MAX_TOPIC_LENGTH],src[SET_COMMAND_SRC], *conf;
+	char topic[MQTT_APP_MAX_TOPIC_LENGTH],src[SET_COMMAND_SRC],objName[CHAR_LENGTH],objName2[CHAR_LENGTH], *conf;
 	int sensor_id,num_sensors, i, id, resp;
 	sensor_gpios_info_t *gpios_info;
 	sensor_additional_parameters_info_t *parameters_info;
 	sensor_data_t *data_info;
 
 	jobj = cJSON_Parse(data);
-
-	resp = -1;
 
 	if (!cJSON_HasObjectItem(jobj,"USER")){
 		ESP_LOGE(TAG2, "mqtt_app_getconf_command, USER not defined!");
@@ -442,33 +440,97 @@ void mqtt_app_getconf_command(char *sensor_name,int sensor_unit,char *data){
 	}
 	id = (int)cJSON_GetNumberValue(aux);
 
-	free(jobj);
+	cJSON_Delete(jobj);
+
+
+	resp = 1;
+
+	sensor_id = get_sensor_id_by_name(sensor_name);
+
+	if (sensor_id > 0){
+		data_info = get_sensor_data (sensor_id, &num_sensors);
+		if (num_sensors == 0 || sensor_unit < 0 || sensor_unit >= num_sensors){
+			resp = -1;
+		}
+	}else resp = -2;
 
 	jobj = cJSON_CreateObject();
 
 	cJSON_AddNumberToObject(jobj,"ID",id);
-	cJSON_AddNumberToObject(jobj,"RES",atoi(resp));
+	cJSON_AddNumberToObject(jobj,"RES",resp);
 
-	sensor_id = get_sensor_id_by_name(sensor_name);
-	data_info = get_sensor_data (sensor_id, &num_sensors);
-	if (num_sensors > 0 && sensor_unit >= 0 && num_sensors > sensor_unit){
-		for(i = 0; i < data_info[sensor_unit].valuesLen ; i++){
+	if (resp == 1){
+		for(i = 0; i < data_info[0].valuesLen; i++){
+			memset(objName,0,CHAR_LENGTH);
+			sprintf(objName,"UT%d",i+1);
+			memset(objName2,0,CHAR_LENGTH);
+			sprintf(objName2,"LT%d",i+1);
 
+			switch (data_info[0].sensor_values[i].sensor_value_type){
+				case INTEGER:
+					cJSON_AddNumberToObject(jobj,objName,data_info[0].sensor_values[i].upper_threshold.ival);
+					cJSON_AddNumberToObject(jobj,objName2,data_info[0].sensor_values[i].lower_threshold.ival);
+					break;
+				case FLOAT:
+					cJSON_AddNumberToObject(jobj,objName,data_info[0].sensor_values[i].upper_threshold.fval);
+					cJSON_AddNumberToObject(jobj,objName2,data_info[0].sensor_values[i].lower_threshold.fval);
+					break;
+
+				case STRING:
+					cJSON_AddStringToObject(jobj,objName,data_info[0].sensor_values[i].upper_threshold.cval);
+					cJSON_AddStringToObject(jobj,objName2,data_info[0].sensor_values[i].upper_threshold.cval);
+					break;
+
+				default:
+					break;
+			}
+		}
+		for(i = 0; i < num_sensors;i++) free(data_info[i].sensor_values);
+		free(data_info);
+
+
+		gpios_info = get_sensor_gpios(sensor_id, &num_sensors);
+		if (num_sensors > sensor_unit && gpios_info != NULL){
+			for(i = 0; i < gpios_info[sensor_unit].gpiosLen; i++){
+				cJSON_AddNumberToObject(jobj,gpios_info[sensor_unit].sensor_gpios[i].gpioName,gpios_info[sensor_unit].sensor_gpios[i].sensor_gpio);
+			}
+			for(i = 0; i < num_sensors;i++) free(gpios_info[i].sensor_gpios);
+			free(gpios_info);
+		}
+
+
+		parameters_info = get_sensor_parameters(sensor_id, &num_sensors);
+		if (num_sensors > sensor_unit && parameters_info != NULL){
+			for(i = 0; i < parameters_info[sensor_unit].parametersLen; i++){
+				switch (parameters_info[sensor_unit].sensor_parameters[i].sensor_parameter_type){
+					case INTEGER:
+						cJSON_AddNumberToObject(jobj,parameters_info[sensor_unit].sensor_parameters[i].parameterName,parameters_info[sensor_unit].sensor_parameters[i].sensor_parameter.ival);
+						break;
+					case FLOAT:
+						cJSON_AddNumberToObject(jobj,parameters_info[sensor_unit].sensor_parameters[i].parameterName,parameters_info[sensor_unit].sensor_parameters[i].sensor_parameter.fval);
+						break;
+
+					case STRING:
+						cJSON_AddStringToObject(jobj,parameters_info[sensor_unit].sensor_parameters[i].parameterName,parameters_info[sensor_unit].sensor_parameters[i].sensor_parameter.cval);
+						break;
+
+					default:
+						break;
+				}
+			}
+			for(i = 0; i < num_sensors;i++) free(parameters_info[i].sensor_parameters);
+			free(parameters_info);
 		}
 	}
-
-
-
-
 
 	conf = cJSON_Print(jobj);
 
 	memset(topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
-	concatenate_topic(USERS_TOPIC, data,RESP_TOPIC,NULL,NULL,NULL,NULL ,topic);
+	concatenate_topic(USERS_TOPIC, src,RESP_TOPIC,NULL,NULL,NULL,NULL ,topic);
 
 	mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, topic, conf);
 
-	free(resp);
+	free(conf);
 }
 
 void mqtt_app_send_resp(char *src, int id, int resp){
