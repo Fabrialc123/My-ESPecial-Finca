@@ -1,0 +1,78 @@
+A través de este comando es posible conocer la configuración de un sensor ya instalado en formato JSON.
+Se obtendrán la siguiente información:
+
+- Umbrales de Alarma: Campos "UTX" (umbral superior) y "LTX" (umbral superior), siendo X el número de valor, por ejemplo el DHT22 tiene dos valores (Temperatura y Humedad),
+siendo UT1 y LT1 para la temperatura, y UT2 y LT2 para la humedad.
+- GPIOS conectados. Por ejemplo para el MQ2 saldría el campo "A0", mientras que para el HC-RS04 saldrán "Trig" y "Echo".
+- Parametros adicionales (en caso de que los tuvieran). Por ejemplo, para el HC-RS04 saldrán "Sensor - Tank (cm)" y "Tank depth (cm)"
+
+Para hacer uso del comando hay que publicar en el tópico "MESPF/SENS/ESP32_X/Y/Z/CMD/GETCONF".
+Siendo Y el sensor a consultar (HC-RS04, MQ2, SO-SEN o DHT22), y Z la unidad (1-Inf)
+
+El mensaje a publicar debe de ser un JSON con el siguiente formato:
+{
+  "USER":"X",
+  "ID": Y
+}
+Siendo X el usuario que envía la petición e Y un número para luego identificar la respuesta.
+
+Si el mensaje publicado es correcto, el ESP32 publicará en MESP/USR/X la respuesta en formato JSON dependiendo del sensor consultado.
+Ejemplos de respuesta de los sensores:
+HC-RS04
+{
+  "DT": {
+    "ID": 45,
+    "RES": 1,
+    "UT1": 1000,
+    "LT1": -1000,
+    "Trig": 36,
+    "Echo": 35,
+    "Sensor - Tank (cm)": 10,
+    "Tank depth (cm)": 110
+  },
+  "TS": "23:27:52 11/04/2023"
+}
+
+MQ2
+{
+  "DT": {
+    "ID": 45,
+    "RES": 1,
+    "UT1": 600,
+    "LT1": -600,
+    "A0": 39
+  },
+  "TS": "23:32:11 11/04/2023"
+}
+
+DHT22
+{
+  "DT": {
+    "ID": 45,
+    "RES": 1,
+    "UT1": 600,
+    "LT1": -600,
+    "UT2": 1000,
+    "LT2": -1000,
+    "Data": 33
+  },
+  "TS": "23:33:05 11/04/2023"
+}
+
+SO-SEN
+{
+  "DT": {
+    "ID": 45,
+    "RES": 1,
+    "UT1": 500,
+    "LT1": -500,
+    "A0": 34
+  },
+  "TS": "23:33:31 11/04/2023"
+}
+
+
+Posibles valores del campo "RES":
+- 1: Todo ha ido bien
+- -1: Se ha intentado consultar una unidad no instalada. Por ejemplo si solo hay 2 sensores MQ2 instalados y se publica en MESP/SENS/ESP32_X/MQ2/3/CMD/GETCONF
+- -2: Se ha intentado consultar un tipo de sensor no soportado. Por ejemplo, publicar en MESP/SENS/ESP32_X/SENSORINVENTADO/3/CMD/GETCONF
