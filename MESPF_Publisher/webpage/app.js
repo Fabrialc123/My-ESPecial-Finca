@@ -632,6 +632,7 @@ function deploySensorForm(id){
 	// Deploy some warning notes
 	document.getElementById("warning_notes").innerHTML =	'<h4>Warnings:</h4>\
 															<ul>\
+																<li>GPIOS 34,35,36,39 are input only, be careful with sensors that need output pins.</li>\
 																<li>GPIO 12 is internally pulled high in the module and is not recommended for use as a touch pin.</li>\
 																<li>GPIOS 6,7,8,9,10,11 are connected to the SPI flash integrated on the module and are not recommended for other uses.</li>\
 																<li>ADC2 channels shouldn\'t be used while ESP32 WiFi function is active. (Values obtained will be incorrect)</li>\
