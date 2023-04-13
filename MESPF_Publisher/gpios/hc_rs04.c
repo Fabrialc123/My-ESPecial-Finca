@@ -319,6 +319,13 @@ int hc_rs04_add_sensor(int* gpios, union sensor_value_u* parameters, char* reaso
 	if(!check_valid_parameters(parameters, reason))
 		return -1;
 
+	if(!GPIO_IS_VALID_OUTPUT_GPIO(gpios[0])){
+		ESP_LOGE(TAG, "GPIO %d is input only, \"Trig\" needs to be output", gpios[0]);
+		sprintf(reason, "GPIO %d is input only, \"Trig\" needs to be output", gpios[0]);
+
+		return -1;
+	}
+
 	if(gpios_manager_lock_gpios(gpios, HC_RS04_N_GPIOS, reason) == -1)
 		return -1;
 
@@ -427,6 +434,13 @@ int hc_rs04_set_gpios(int pos, int* gpios, char* reason){
 	if(!check_valid_pos(pos)){
 		ESP_LOGE(TAG, "Position not valid");
 		sprintf(reason, "Position not valid");
+
+		return -1;
+	}
+
+	if(!GPIO_IS_VALID_OUTPUT_GPIO(gpios[0])){
+		ESP_LOGE(TAG, "GPIO %d is input only, \"Trig\" needs to be output", gpios[0]);
+		sprintf(reason, "GPIO %d is input only, \"Trig\" needs to be output", gpios[0]);
 
 		return -1;
 	}
