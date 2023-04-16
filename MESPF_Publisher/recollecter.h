@@ -41,6 +41,7 @@ typedef struct {
 
 typedef struct {
 	char sensorName[CHAR_LENGTH];
+	char sensorLocation[CHAR_LENGTH+1];
 	int valuesLen;
 	sensor_value_t *sensor_values;
 }sensor_data_t;
@@ -82,6 +83,7 @@ int delete_recollecter (int id);
 int get_recollecters_size (void);
 
 void get_sensors_configuration_cjson(char *data);
+void get_sensors_locations_cjson(char *data);
 void get_sensors_values_cjson(char *data);
 void get_sensors_gpios_cjson(char *data);
 void get_sensors_parameters_cjson(char *data);
