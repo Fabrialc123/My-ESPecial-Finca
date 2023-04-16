@@ -187,6 +187,7 @@ function initSensors(){
 	setTimeout(sensorsValuesUpdate, 1000);
 	setTimeout(sensorsGpiosUpdate, 1000);
 	setTimeout(sensorsParametersUpdate, 1000);
+	setTimeout(sensorsLocationsUpdate, 1000);
 	setTimeout(sensorsAlertsUpdate, 1000);
 	
 	setTimeout(gpiosAvailablesUpdate, 1000);
@@ -302,9 +303,10 @@ function getSensorsConfiguration(){
 																			<p>[ Unit '+ j +' ]</p>\
 																		</div>\
 																		<div class="col-3">\
-																			<label>Location: <input type="text" id="sensor_'+ i +'_unit_'+ j +'_location" disabled/></label>\
-																			<input type="button" value="Submit" id="sensor_'+ i +'_unit_'+ j +'_location_submit" onclick="submitSensorLocation('+ i +','+ j +');" hidden>\
-																			<input type="button" value="Edit" id="sensor_'+ i +'_unit_'+ j +'_location_edit" onclick="editSensorLocation('+ i +','+ j +');">\
+																			<label>Location: <input type="text" id="sensor_'+ i +'_unit_'+ j +'_location" value="" disabled/></label>\
+																			<input type="button" value="Cancel" id="sensor_'+ i +'_unit_'+ j +'_location_cancel" onclick="submitSensorLocation('+ i +','+ j +',false);" hidden>\
+																			<input type="button" value="Submit" id="sensor_'+ i +'_unit_'+ j +'_location_submit" onclick="submitSensorLocation('+ i +','+ j +',true);" hidden>\
+																			<input type="button" class="edit_location" value="Edit" id="sensor_'+ i +'_unit_'+ j +'_location_edit" onclick="editSensorLocation('+ i +','+ j +');">\
 																		</div>\
 																		<div class="col-3" id="sensor_'+ i +'_unit_'+ j +'_gpios">\
 																		</div>\
@@ -505,6 +507,26 @@ function sensorsParametersUpdate(){
 				for(let k = 0; k < sensor_n_parameters; k++){
 					$('#sensor_'+ i +'_unit_'+ j +'_parameter_'+ k +'_span').text(data[i.toString()][j][k]);
 				}
+			}
+		}
+	});
+}
+
+/**
+ * Update sensors locations
+ */
+function sensorsLocationsUpdate(){
+	
+	$.getJSON('/SensorsLocations', function(data){
+		
+		var sensor_n_units;
+		
+		for(let i = 1; i < sensorsInstalled; i++){
+			
+			sensor_n_units = document.getElementById("sensor_" + i).dataset.sensor_n_units;
+			
+			for(let j = 0; j < sensor_n_units; j++){
+				$('#sensor_'+ i +'_unit_'+ j +'_location').val(data[i.toString()][j]);
 			}
 		}
 	});
@@ -857,17 +879,39 @@ function editMQTTConf()
 	getConnectionsConfiguration();
 }
 
-function submitSensorLocation(i, j)
+function submitSensorLocation(i,j,process)
 {
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location').disabled = true;
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location_edit').hidden = false;
+	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location_cancel').hidden = true;
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location_submit').hidden = true;
+	
+	if(process == true){
+		// Http Request
+		var request = new XMLHttpRequest();
+		var requestURL = "/SensorEditLocation";		//SensorEditLocation has to be handled
+		var loc = document.getElementById('sensor_'+ i +'_unit_'+ j +'_location').value;
+		
+		request.open('POST', requestURL, false);
+		
+		request.send(i + "\n" + j + "\n" + loc.length + "\n" + loc + "\0");
+		
+		if (request.readyState == 4 && request.status == 200) {
+			window.alert(request.responseText);
+		}
+	}
+	
+	unlockEdits("edit_location");
+	sensorsLocationsUpdate();
 }
 
-function editSensorLocation(i, j)
+function editSensorLocation(i,j)
 {
+	lockEdits("edit_location");
+	
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location').disabled = false;
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location_edit').hidden = true;
+	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location_cancel').hidden = false;
 	document.getElementById('sensor_'+ i +'_unit_'+ j +'_location_submit').hidden = false;
 }
 
