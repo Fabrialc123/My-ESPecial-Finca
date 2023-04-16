@@ -37,6 +37,7 @@ static pthread_mutex_t mutex_hc_rs04;
 static hc_rs04_additional_params_t* hc_rs04_additional_params_array;
 static hc_rs04_gpios_t* hc_rs04_gpios_array;
 static hc_rs04_data_t* hc_rs04_data_array;
+static char** hc_rs04_locations_array;
 
 static int hc_rs04_cont								= 0;
 
@@ -54,6 +55,7 @@ static bool* water_level_is_alerted;
 #define nvs_HC_RS04_GPIOS_key		"hc_rs04_gpios"
 #define nvs_HC_RS04_PARAMETERS_key	"hc_rs04_param"
 #define nvs_HC_RS04_ALERTS_key		"hc_rs04_alert"
+#define nvs_HC_RS04_LOCATIONS_key	"hc_rs04_loc"
 
 /**
  * Check if parameters are valid
@@ -235,7 +237,7 @@ void hc_rs04_init(void){
 		int res_rec, res_sen;
 
 		res_rec = register_recollecter(&hc_rs04_get_sensors_data, &hc_rs04_get_sensors_gpios, &hc_rs04_get_sensors_additional_parameters);
-		res_sen = sensors_manager_add(&hc_rs04_add_sensor, &hc_rs04_delete_sensor, &hc_rs04_set_gpios, &hc_rs04_set_parameters, &hc_rs04_set_alert_values);
+		res_sen = sensors_manager_add(&hc_rs04_add_sensor, &hc_rs04_delete_sensor, &hc_rs04_set_gpios, &hc_rs04_set_parameters, &hc_rs04_set_location, &hc_rs04_set_alert_values);
 
 		if(res_rec == 1 && res_sen == 1){
 
@@ -252,6 +254,13 @@ void hc_rs04_init(void){
 			hc_rs04_additional_params_array = (hc_rs04_additional_params_t*) malloc(sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
 			hc_rs04_gpios_array = (hc_rs04_gpios_t*) malloc(sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
 			hc_rs04_data_array = (hc_rs04_data_t*) malloc(sizeof(hc_rs04_data_t) * hc_rs04_cont);
+			hc_rs04_locations_array = (char**) malloc(sizeof(char*) * hc_rs04_cont);
+
+				// Initialize locations
+			for(int i = 0; i < hc_rs04_cont; i++){
+				hc_rs04_locations_array[i] = (char*) malloc(CHAR_LENGTH + 1);
+				memset(hc_rs04_locations_array[i],0,CHAR_LENGTH + 1);
+			}
 
 			water_level_alert_counter = (int*) malloc(sizeof(int) * hc_rs04_cont);
 			water_level_is_alerted = (bool*) malloc(sizeof(bool) * hc_rs04_cont);
@@ -294,6 +303,20 @@ void hc_rs04_init(void){
 				nvs_app_get_blob_value(nvs_HC_RS04_PARAMETERS_key,NULL,&size);
 				if(size != 0)
 					nvs_app_get_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,&size);
+
+				char key[15];
+				char num[3];
+
+				for(int i = 0; i < hc_rs04_cont; i++){
+					size = 0;
+					strcpy(key, nvs_HC_RS04_LOCATIONS_key);
+					sprintf(num, "%d", i);
+					strcat(key,num);
+
+					nvs_app_get_string_value(key,NULL,&size);
+					if(size != 0)
+						nvs_app_get_string_value(key,hc_rs04_locations_array[i],&size);
+				}
 			}
 
 			xTaskCreatePinnedToCore(&hc_rs04_task, "hc_rs04_task", HC_RS04_STACK_SIZE, NULL, HC_RS04_PRIORITY, &task_hc_rs04, HC_RS04_CORE_ID);
@@ -343,6 +366,10 @@ int hc_rs04_add_sensor(int* gpios, union sensor_value_u* parameters, char* reaso
 	hc_rs04_additional_params_array = (hc_rs04_additional_params_t*) realloc(hc_rs04_additional_params_array, sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
 	hc_rs04_gpios_array = (hc_rs04_gpios_t*) realloc(hc_rs04_gpios_array, sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
 	hc_rs04_data_array = (hc_rs04_data_t*) realloc(hc_rs04_data_array, sizeof(hc_rs04_data_t) * hc_rs04_cont);
+	hc_rs04_locations_array = (char**) realloc(hc_rs04_locations_array, sizeof(char*) * hc_rs04_cont);
+
+	hc_rs04_locations_array[hc_rs04_cont - 1] = (char*) malloc(CHAR_LENGTH + 1);
+	memset(hc_rs04_locations_array[hc_rs04_cont - 1],0,CHAR_LENGTH + 1);
 
 	water_level_alert_counter = (int*) realloc(water_level_alert_counter, sizeof(int) * hc_rs04_cont);
 	water_level_is_alerted = (bool*) realloc(water_level_is_alerted, sizeof(bool) * hc_rs04_cont);
@@ -355,12 +382,25 @@ int hc_rs04_add_sensor(int* gpios, union sensor_value_u* parameters, char* reaso
 
 	hc_rs04_data_array[hc_rs04_cont - 1].water_level_percentage = 0.0;
 
+	strcpy(hc_rs04_locations_array[hc_rs04_cont - 1], "");
+
 	water_level_alert_counter[hc_rs04_cont - 1] = 0;
 	water_level_is_alerted[hc_rs04_cont - 1] = false;
 
 	nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
 	nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
 	nvs_app_set_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,sizeof(hc_rs04_additional_params_t)*hc_rs04_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < hc_rs04_cont; i++){
+		strcpy(key, nvs_HC_RS04_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,hc_rs04_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_hc_rs04);
 
@@ -399,6 +439,8 @@ int hc_rs04_delete_sensor(int pos, char* reason){
 
 		hc_rs04_data_array[pos].water_level_percentage = hc_rs04_data_array[pos + 1].water_level_percentage;
 
+		strcpy(hc_rs04_locations_array[pos], hc_rs04_locations_array[pos + 1]);
+
 		water_level_alert_counter[pos] = water_level_alert_counter[pos + 1];
 		water_level_is_alerted[pos] = water_level_is_alerted[pos + 1];
 	}
@@ -409,12 +451,26 @@ int hc_rs04_delete_sensor(int pos, char* reason){
 	hc_rs04_gpios_array = (hc_rs04_gpios_t*) realloc(hc_rs04_gpios_array, sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
 	hc_rs04_data_array = (hc_rs04_data_t*) realloc(hc_rs04_data_array, sizeof(hc_rs04_data_t) * hc_rs04_cont);
 
+	free(hc_rs04_locations_array[hc_rs04_cont]);
+	hc_rs04_locations_array = (char**) realloc(hc_rs04_locations_array, sizeof(char*) * hc_rs04_cont);
+
 	water_level_alert_counter = (int*) realloc(water_level_alert_counter, sizeof(int) * hc_rs04_cont);
 	water_level_is_alerted = (bool*) realloc(water_level_is_alerted, sizeof(bool) * hc_rs04_cont);
 
 	nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
 	nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
 	nvs_app_set_blob_value(nvs_HC_RS04_PARAMETERS_key,hc_rs04_additional_params_array,sizeof(hc_rs04_additional_params_t)*hc_rs04_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < hc_rs04_cont; i++){
+		strcpy(key, nvs_HC_RS04_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,hc_rs04_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_hc_rs04);
 
@@ -500,6 +556,48 @@ int hc_rs04_set_parameters(int pos, union sensor_value_u* parameters, char* reas
 	return 1;
 }
 
+int hc_rs04_set_location(int pos, char* location, char* reason){
+	if(!g_hc_rs04_initialized){
+		ESP_LOGE(TAG, "HC-RS04 not initialized");
+		sprintf(reason, "HC-RS04 not initialized");
+
+		return -1;
+	}
+
+	if(!check_valid_pos(pos)){
+		ESP_LOGE(TAG, "Position not valid");
+		sprintf(reason, "Position not valid");
+
+		return -1;
+	}
+
+	if(strlen(location) >= CHAR_LENGTH){
+		ESP_LOGE(TAG, "Location too long (20 characters max)");
+		sprintf(reason, "Location too long (20 characters max)");
+
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_hc_rs04);
+
+	strcpy(hc_rs04_locations_array[pos], location);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < hc_rs04_cont; i++){
+		strcpy(key, nvs_HC_RS04_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,hc_rs04_locations_array[i]);
+	}
+
+	pthread_mutex_unlock(&mutex_hc_rs04);
+
+	return 1;
+}
+
 int hc_rs04_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold, char* reason){
 	if(!g_hc_rs04_initialized){
 		ESP_LOGE(TAG, "HC-RS04 not initialized");
@@ -563,6 +661,7 @@ sensor_data_t* hc_rs04_get_sensors_data(int* number_of_sensors){
 		aux2 = (sensor_value_t*) malloc(sizeof(sensor_value_t) * HC_RS04_N_VALUES);
 
 		strcpy(aux[0].sensorName, "HC-RS04");
+		strcpy(aux[0].sensorLocation, "N/A");
 		aux[0].valuesLen = HC_RS04_N_VALUES;
 		aux[0].sensor_values = aux2;
 
@@ -584,6 +683,7 @@ sensor_data_t* hc_rs04_get_sensors_data(int* number_of_sensors){
 			aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * HC_RS04_N_VALUES);
 
 			strcpy(aux[i].sensorName, "HC-RS04");
+			strcpy(aux[i].sensorLocation, hc_rs04_locations_array[i]);
 			aux[i].valuesLen = HC_RS04_N_VALUES;
 			aux[i].sensor_values = aux2;
 
