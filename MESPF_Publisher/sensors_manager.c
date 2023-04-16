@@ -27,6 +27,7 @@ static delete_unit_function *delete_unit;
 
 static set_gpios_function *set_gpios;
 static set_parameters_function *set_parameters;
+static set_location_function *set_location;
 static set_alert_values_function *set_alert_values;
 
 static int sensors_manager_cont;
@@ -62,6 +63,7 @@ void sensors_manager_init(void){
 
 		set_gpios = (set_gpios_function*) malloc(sizeof(set_gpios_function) * 1);
 		set_parameters = (set_parameters_function*) malloc(sizeof(set_parameters_function) * 1);
+		set_location = (set_location_function*) malloc(sizeof(set_location_function) * 1);
 		set_alert_values = (set_alert_values_function*) malloc(sizeof(set_alert_values_function) * 1);
 
 		sensors_manager_cont = 0;
@@ -70,7 +72,7 @@ void sensors_manager_init(void){
 	}
 }
 
-int sensors_manager_add(add_unit_function aun, delete_unit_function dun, set_gpios_function sgp, set_parameters_function spa, set_alert_values_function sal){
+int sensors_manager_add(add_unit_function aun, delete_unit_function dun, set_gpios_function sgp, set_parameters_function spa, set_location_function slo, set_alert_values_function sal){
 	if(!g_sensors_manager_initialized){
 		ESP_LOGE(TAG, "Sensors manager not initialized");
 
@@ -86,6 +88,7 @@ int sensors_manager_add(add_unit_function aun, delete_unit_function dun, set_gpi
 
 	set_gpios = (set_gpios_function*) realloc(set_gpios, sizeof(set_gpios_function) * sensors_manager_cont);
 	set_parameters = (set_parameters_function*) realloc(set_parameters, sizeof(set_parameters_function) * sensors_manager_cont);
+	set_location = (set_location_function*) realloc(set_location, sizeof(set_location_function) * sensors_manager_cont);
 	set_alert_values = (set_alert_values_function*) realloc(set_alert_values, sizeof(set_alert_values_function) * sensors_manager_cont);
 
 	add_unit[sensors_manager_cont - 1] = aun;
@@ -93,6 +96,7 @@ int sensors_manager_add(add_unit_function aun, delete_unit_function dun, set_gpi
 
 	set_gpios[sensors_manager_cont - 1] = sgp;
 	set_parameters[sensors_manager_cont - 1] = spa;
+	set_location[sensors_manager_cont - 1] = slo;
 	set_alert_values[sensors_manager_cont - 1] = sal;
 
 	pthread_mutex_unlock(&mutex_sensors_manager);
@@ -208,6 +212,32 @@ int sensors_manager_set_parameters(int id, int pos, union sensor_value_u* parame
 	set_parameters_function foo = set_parameters[id];
 
 	int res = foo(pos, parameters, reason);
+
+	pthread_mutex_unlock(&mutex_sensors_manager);
+
+	return res;
+}
+
+int sensors_manager_set_location(int id, int pos, char* location, char* reason){
+	if(!g_sensors_manager_initialized){
+		ESP_LOGE(TAG, "Sensors manager not initialized");
+		sprintf(reason, "Sensors manager not initialized");
+
+		return -1;
+	}
+
+	if(!check_valid_id(id)){
+		ESP_LOGE(TAG, "Sensor id not valid");
+		sprintf(reason, "Sensor id not valid");
+
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_sensors_manager);
+
+	set_location_function foo = set_location[id];
+
+	int res = foo(pos, location, reason);
 
 	pthread_mutex_unlock(&mutex_sensors_manager);
 
