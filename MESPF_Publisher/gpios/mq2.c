@@ -32,6 +32,7 @@ static pthread_mutex_t mutex_mq2;
 
 static mq2_gpios_t* mq2_gpios_array;
 static mq2_data_t* mq2_data_array;
+static char** mq2_locations_array;
 
 static int mq2_cont							= 0;
 
@@ -48,6 +49,7 @@ static bool* smoke_gas_is_alerted;
 #define nvs_MQ2_CONT_key		"mq2_cont"
 #define nvs_MQ2_GPIOS_key		"mq2_gpios"
 #define nvs_MQ2_ALERTS_key		"mq2_alert"
+#define nvs_MQ2_LOCATIONS_key	"mq2_loc"
 
 /**
  * Check if position is valid
@@ -215,7 +217,7 @@ void mq2_init(void){
 		int res_rec, res_sen;
 
 		res_rec = register_recollecter(&mq2_get_sensors_data, &mq2_get_sensors_gpios, &mq2_get_sensors_additional_parameters);
-		res_sen = sensors_manager_add(&mq2_add_sensor, &mq2_delete_sensor, &mq2_set_gpios, &mq2_set_parameters, &mq2_set_alert_values);
+		res_sen = sensors_manager_add(&mq2_add_sensor, &mq2_delete_sensor, &mq2_set_gpios, &mq2_set_parameters, &mq2_set_location, &mq2_set_alert_values);
 
 		if(res_rec == 1 && res_sen == 1){
 
@@ -231,6 +233,13 @@ void mq2_init(void){
 			// Initialize pointers
 			mq2_gpios_array = (mq2_gpios_t*) malloc(sizeof(mq2_gpios_t) * mq2_cont);
 			mq2_data_array = (mq2_data_t*) malloc(sizeof(mq2_data_t) * mq2_cont);
+			mq2_locations_array = (char**) malloc(sizeof(char*) * mq2_cont);
+
+				// Initialize locations
+			for(int i = 0; i < mq2_cont; i++){
+				mq2_locations_array[i] = (char*) malloc(CHAR_LENGTH + 1);
+				memset(mq2_locations_array[i],0,CHAR_LENGTH + 1);
+			}
 
 			smoke_gas_alert_counter = (int*) malloc(sizeof(int) * mq2_cont);
 			smoke_gas_is_alerted = (bool*) malloc(sizeof(bool) * mq2_cont);
@@ -263,6 +272,20 @@ void mq2_init(void){
 					gpios[0] = mq2_gpios_array[i].a0;
 					gpios_manager_lock_gpios(gpios, MQ2_N_GPIOS, dump);
 					adc1_config_channel_atten(gpio_into_channel(gpios[0]), mq2_atten);
+				}
+
+				char key[15];
+				char num[3];
+
+				for(int i = 0; i < mq2_cont; i++){
+					size = 0;
+					strcpy(key, nvs_MQ2_LOCATIONS_key);
+					sprintf(num, "%d", i);
+					strcat(key,num);
+
+					nvs_app_get_string_value(key,NULL,&size);
+					if(size != 0)
+						nvs_app_get_string_value(key,mq2_locations_array[i],&size);
 				}
 			}
 
@@ -306,6 +329,10 @@ int mq2_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason){
 
 	mq2_gpios_array = (mq2_gpios_t*) realloc(mq2_gpios_array, sizeof(mq2_gpios_t) * mq2_cont);
 	mq2_data_array = (mq2_data_t*) realloc(mq2_data_array, sizeof(mq2_data_t) * mq2_cont);
+	mq2_locations_array = (char**) realloc(mq2_locations_array, sizeof(char*) * mq2_cont);
+
+	mq2_locations_array[mq2_cont - 1] = (char*) malloc(CHAR_LENGTH + 1);
+	memset(mq2_locations_array[mq2_cont - 1],0,CHAR_LENGTH + 1);
 
 	smoke_gas_alert_counter = (int*) realloc(smoke_gas_alert_counter, sizeof(int) * mq2_cont);
 	smoke_gas_is_alerted = (bool*) realloc(smoke_gas_is_alerted, sizeof(bool) * mq2_cont);
@@ -314,11 +341,24 @@ int mq2_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason){
 
 	mq2_data_array[mq2_cont - 1].smoke_gas_percentage = 0.0;
 
+	strcpy(mq2_locations_array[mq2_cont - 1], "");
+
 	smoke_gas_alert_counter[mq2_cont - 1] = 0;
 	smoke_gas_is_alerted[mq2_cont - 1] = false;
 
 	nvs_app_set_uint8_value(nvs_MQ2_CONT_key,(uint8_t)mq2_cont);
 	nvs_app_set_blob_value(nvs_MQ2_GPIOS_key,mq2_gpios_array,sizeof(mq2_gpios_t)*mq2_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < mq2_cont; i++){
+		strcpy(key, nvs_MQ2_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,mq2_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_mq2);
 
@@ -353,6 +393,8 @@ int mq2_delete_sensor(int pos, char* reason){
 
 		mq2_data_array[pos].smoke_gas_percentage = mq2_data_array[pos + 1].smoke_gas_percentage;
 
+		strcpy(mq2_locations_array[pos], mq2_locations_array[pos + 1]);
+
 		smoke_gas_alert_counter[pos] = smoke_gas_alert_counter[pos + 1];
 		smoke_gas_is_alerted[pos] = smoke_gas_is_alerted[pos + 1];
 	}
@@ -362,11 +404,25 @@ int mq2_delete_sensor(int pos, char* reason){
 	mq2_gpios_array = (mq2_gpios_t*) realloc(mq2_gpios_array, sizeof(mq2_gpios_t) * mq2_cont);
 	mq2_data_array = (mq2_data_t*) realloc(mq2_data_array, sizeof(mq2_data_t) * mq2_cont);
 
+	free(mq2_locations_array[mq2_cont]);
+	mq2_locations_array = (char**) realloc(mq2_locations_array, sizeof(char*) * mq2_cont);
+
 	smoke_gas_alert_counter = (int*) realloc(smoke_gas_alert_counter, sizeof(int) * mq2_cont);
 	smoke_gas_is_alerted = (bool*) realloc(smoke_gas_is_alerted, sizeof(bool) * mq2_cont);
 
 	nvs_app_set_uint8_value(nvs_MQ2_CONT_key,(uint8_t)mq2_cont);
 	nvs_app_set_blob_value(nvs_MQ2_GPIOS_key,mq2_gpios_array,sizeof(mq2_gpios_t)*mq2_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < mq2_cont; i++){
+		strcpy(key, nvs_MQ2_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,mq2_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_mq2);
 
@@ -421,6 +477,48 @@ int mq2_set_gpios(int pos, int* gpios, char* reason){
 int mq2_set_parameters(int pos, union sensor_value_u* parameters, char* reason){
 	sprintf(reason, "MQ2 doesn't have parameters");
 	return -1;
+}
+
+int mq2_set_location(int pos, char* location, char* reason){
+	if(!g_mq2_initialized){
+		ESP_LOGE(TAG, "MQ2 not initialized");
+		sprintf(reason, "MQ2 not initialized");
+
+		return -1;
+	}
+
+	if(!check_valid_pos(pos)){
+		ESP_LOGE(TAG, "Position not valid");
+		sprintf(reason, "Position not valid");
+
+		return -1;
+	}
+
+	if(strlen(location) > CHAR_LENGTH){
+		ESP_LOGE(TAG, "Location too long (20 characters max)");
+		sprintf(reason, "Location too long (20 characters max)");
+
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_mq2);
+
+	strcpy(mq2_locations_array[pos], location);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < mq2_cont; i++){
+		strcpy(key, nvs_MQ2_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,mq2_locations_array[i]);
+	}
+
+	pthread_mutex_unlock(&mutex_mq2);
+
+	return 1;
 }
 
 int mq2_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold, char* reason){
@@ -486,6 +584,7 @@ sensor_data_t* mq2_get_sensors_data(int* number_of_sensors){
 		aux2 = (sensor_value_t*) malloc(sizeof(sensor_value_t) * MQ2_N_VALUES);
 
 		strcpy(aux[0].sensorName, "MQ2");
+		strcpy(aux[0].sensorLocation, "N/A");
 		aux[0].valuesLen = MQ2_N_VALUES;
 		aux[0].sensor_values = aux2;
 
@@ -507,6 +606,7 @@ sensor_data_t* mq2_get_sensors_data(int* number_of_sensors){
 			aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * MQ2_N_VALUES);
 
 			strcpy(aux[i].sensorName, "MQ2");
+			strcpy(aux[i].sensorLocation, mq2_locations_array[i]);
 			aux[i].valuesLen = MQ2_N_VALUES;
 			aux[i].sensor_values = aux2;
 
