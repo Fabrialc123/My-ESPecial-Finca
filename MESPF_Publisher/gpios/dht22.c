@@ -34,6 +34,7 @@ static pthread_mutex_t mutex_dht22;
 
 static dht22_gpios_t* dht22_gpios_array;
 static dht22_data_t* dht22_data_array;
+static char** dht22_locations_array;
 
 static int dht22_cont							= 0;
 
@@ -54,6 +55,7 @@ static bool* temperature_is_alerted;
 #define nvs_DHT22_CONT_key		"dht22_cont"
 #define nvs_DHT22_GPIOS_key		"dht22_gpios"
 #define nvs_DHT22_ALERTS_key	"dht22_alert"
+#define nvs_DHT22_LOCATIONS_key	"dht22_loc"
 
 /**
  * Check if position is valid
@@ -315,7 +317,7 @@ void dht22_init(void){
 		int res_rec, res_sen;
 
 		res_rec = register_recollecter(&dht22_get_sensors_data, &dht22_get_sensors_gpios, &dht22_get_sensors_additional_parameters);
-		res_sen = sensors_manager_add(&dht22_add_sensor, &dht22_delete_sensor, &dht22_set_gpios, &dht22_set_parameters, &dht22_set_alert_values);
+		res_sen = sensors_manager_add(&dht22_add_sensor, &dht22_delete_sensor, &dht22_set_gpios, &dht22_set_parameters, &dht22_set_location, &dht22_set_alert_values);
 
 		if(res_rec == 1 && res_sen == 1){
 
@@ -331,6 +333,13 @@ void dht22_init(void){
 			// Initialize pointers
 			dht22_gpios_array = (dht22_gpios_t*) malloc(sizeof(dht22_gpios_t) * dht22_cont);
 			dht22_data_array = (dht22_data_t*) malloc(sizeof(dht22_data_t) * dht22_cont);
+			dht22_locations_array = (char**) malloc(sizeof(char*) * dht22_cont);
+
+				// Initialize locations
+			for(int i = 0; i < dht22_cont; i++){
+				dht22_locations_array[i] = (char*) malloc(CHAR_LENGTH + 1);
+				memset(dht22_locations_array[i],0,CHAR_LENGTH + 1);
+			}
 
 			humidity_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
 			humidity_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
@@ -367,6 +376,20 @@ void dht22_init(void){
 				for(int i = 0; i < dht22_cont; i++){
 					gpios[0] = dht22_gpios_array[i].data;
 					gpios_manager_lock_gpios(gpios, DHT22_N_GPIOS, dump);
+				}
+
+				char key[15];
+				char num[3];
+
+				for(int i = 0; i < dht22_cont; i++){
+					size = 0;
+					strcpy(key, nvs_DHT22_LOCATIONS_key);
+					sprintf(num, "%d", i);
+					strcat(key,num);
+
+					nvs_app_get_string_value(key,NULL,&size);
+					if(size != 0)
+						nvs_app_get_string_value(key,dht22_locations_array[i],&size);
 				}
 			}
 
@@ -406,6 +429,10 @@ int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason)
 
 	dht22_gpios_array = (dht22_gpios_t*) realloc(dht22_gpios_array, sizeof(dht22_gpios_t) * dht22_cont);
 	dht22_data_array = (dht22_data_t*) realloc(dht22_data_array, sizeof(dht22_data_t) * dht22_cont);
+	dht22_locations_array = (char**) realloc(dht22_locations_array, sizeof(char*) * dht22_cont);
+
+	dht22_locations_array[dht22_cont - 1] = (char*) malloc(CHAR_LENGTH + 1);
+	memset(dht22_locations_array[dht22_cont - 1],0,CHAR_LENGTH + 1);
 
 	humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
 	humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
@@ -418,6 +445,8 @@ int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason)
 	dht22_data_array[dht22_cont - 1].humidity = 0.0;
 	dht22_data_array[dht22_cont - 1].temperature = 0.0;
 
+	strcpy(dht22_locations_array[dht22_cont - 1], "");
+
 	humidity_alert_counter[dht22_cont - 1] = 0;
 	humidity_is_alerted[dht22_cont - 1] = false;
 
@@ -426,6 +455,17 @@ int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason)
 
 	nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
 	nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < dht22_cont; i++){
+		strcpy(key, nvs_DHT22_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,dht22_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_dht22);
 
@@ -461,6 +501,8 @@ int dht22_delete_sensor(int pos, char* reason){
 		dht22_data_array[pos].humidity = dht22_data_array[pos + 1].humidity;
 		dht22_data_array[pos].temperature = dht22_data_array[pos + 1].temperature;
 
+		strcpy(dht22_locations_array[pos], dht22_locations_array[pos + 1]);
+
 		humidity_alert_counter[pos] = humidity_alert_counter[pos + 1];
 		humidity_is_alerted[pos] = humidity_is_alerted[pos + 1];
 
@@ -473,6 +515,9 @@ int dht22_delete_sensor(int pos, char* reason){
 	dht22_gpios_array = (dht22_gpios_t*) realloc(dht22_gpios_array, sizeof(dht22_gpios_t) * dht22_cont);
 	dht22_data_array = (dht22_data_t*) realloc(dht22_data_array, sizeof(dht22_data_t) * dht22_cont);
 
+	free(dht22_locations_array[dht22_cont]);
+	dht22_locations_array = (char**) realloc(dht22_locations_array, sizeof(char*) * dht22_cont);
+
 	humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
 	humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
 
@@ -481,6 +526,17 @@ int dht22_delete_sensor(int pos, char* reason){
 
 	nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
 	nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < dht22_cont; i++){
+		strcpy(key, nvs_DHT22_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,dht22_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_dht22);
 
@@ -531,6 +587,48 @@ int dht22_set_gpios(int pos, int* gpios, char* reason){
 int dht22_set_parameters(int pos, union sensor_value_u* parameters, char* reason){
 	sprintf(reason, "DHT22 doesn't have parameters");
 	return -1;
+}
+
+int dht22_set_location(int pos, char* location, char* reason){
+	if(!g_dht22_initialized){
+		ESP_LOGE(TAG, "DHT22 not initialized");
+		sprintf(reason, "DHT22 not initialized");
+
+		return -1;
+	}
+
+	if(!check_valid_pos(pos)){
+		ESP_LOGE(TAG, "Position not valid");
+		sprintf(reason, "Position not valid");
+
+		return -1;
+	}
+
+	if(strlen(location) >= CHAR_LENGTH){
+		ESP_LOGE(TAG, "Location too long (20 characters max)");
+		sprintf(reason, "Location too long (20 characters max)");
+
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_dht22);
+
+	strcpy(dht22_locations_array[pos], location);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < dht22_cont; i++){
+		strcpy(key, nvs_DHT22_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,dht22_locations_array[i]);
+	}
+
+	pthread_mutex_unlock(&mutex_dht22);
+
+	return 1;
 }
 
 int dht22_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold, char* reason){
@@ -604,6 +702,7 @@ sensor_data_t* dht22_get_sensors_data(int* number_of_sensors){
 		aux2 = (sensor_value_t*) malloc(sizeof(sensor_value_t) * DHT22_N_VALUES);
 
 		strcpy(aux[0].sensorName, "DHT22");
+		strcpy(aux[0].sensorLocation, "N/A");
 		aux[0].valuesLen = DHT22_N_VALUES;
 		aux[0].sensor_values = aux2;
 
@@ -633,6 +732,7 @@ sensor_data_t* dht22_get_sensors_data(int* number_of_sensors){
 			aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * DHT22_N_VALUES);
 
 			strcpy(aux[i].sensorName, "DHT22");
+			strcpy(aux[i].sensorLocation, dht22_locations_array[i]);
 			aux[i].valuesLen = DHT22_N_VALUES;
 			aux[i].sensor_values = aux2;
 
