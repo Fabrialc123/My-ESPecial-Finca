@@ -17,6 +17,7 @@ typedef int (*delete_unit_function)(int,char*);
 
 typedef int (*set_gpios_function)(int,int*,char*);
 typedef int (*set_parameters_function)(int,union sensor_value_u*,char*);
+typedef int (*set_location_function)(int,char*,char*);
 typedef int (*set_alert_values_function)(int,bool,int,union sensor_value_u,union sensor_value_u,char*);
 
 /**
@@ -29,7 +30,7 @@ void sensors_manager_init(void);
  *
  * return 1 if done, -1 if not
  */
-int sensors_manager_add(add_unit_function aun, delete_unit_function dun, set_gpios_function sgp, set_parameters_function spa, set_alert_values_function sal);
+int sensors_manager_add(add_unit_function aun, delete_unit_function dun, set_gpios_function sgp, set_parameters_function spa, set_location_function slo, set_alert_values_function sal);
 
 /**
  * Initialize all sensor drivers located in "/gpios" directory
@@ -63,6 +64,13 @@ int sensors_manager_set_gpios(int id, int pos, int* gpios, char* reason);
  * return 1 if done, -1 if not
  */
 int sensors_manager_set_parameters(int id, int pos, union sensor_value_u* parameters, char* reason);
+
+/**
+ * Set new location to sensor unit with identifier "id" and position "pos"
+ *
+ * return 1 if done, -1 if not
+ */
+int sensors_manager_set_location(int id, int pos, char* location, char* reason);
 
 /**
  * Set new alert values to sensor with identifier "id"
