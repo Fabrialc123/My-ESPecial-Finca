@@ -32,6 +32,7 @@ static pthread_mutex_t mutex_so_sen;
 
 static so_sen_gpios_t* so_sen_gpios_array;
 static so_sen_data_t* so_sen_data_array;
+static char** so_sen_locations_array;
 
 static int so_sen_cont								= 0;
 
@@ -48,6 +49,7 @@ static bool* soil_moisture_is_alerted;
 #define nvs_SO_SEN_CONT_key			"so_sen_cont"
 #define nvs_SO_SEN_GPIOS_key		"so_sen_gpios"
 #define nvs_SO_SEN_ALERTS_key		"so_sen_alert"
+#define nvs_SO_SEN_LOCATIONS_key	"so_sen_loc"
 
 /**
  * Check if position is valid
@@ -215,7 +217,7 @@ void so_sen_init(void){
 		int res_rec, res_sen;
 
 		res_rec = register_recollecter(&so_sen_get_sensors_data, &so_sen_get_sensors_gpios, &so_sen_get_sensors_additional_parameters);
-		res_sen = sensors_manager_add(&so_sen_add_sensor, &so_sen_delete_sensor, &so_sen_set_gpios, &so_sen_set_parameters, &so_sen_set_alert_values);
+		res_sen = sensors_manager_add(&so_sen_add_sensor, &so_sen_delete_sensor, &so_sen_set_gpios, &so_sen_set_parameters, &so_sen_set_location, &so_sen_set_alert_values);
 
 		if(res_rec == 1 && res_sen == 1){
 
@@ -231,6 +233,13 @@ void so_sen_init(void){
 			// Initialize pointers
 			so_sen_gpios_array = (so_sen_gpios_t*) malloc(sizeof(so_sen_gpios_t) * so_sen_cont);
 			so_sen_data_array = (so_sen_data_t*) malloc(sizeof(so_sen_data_t) * so_sen_cont);
+			so_sen_locations_array = (char**) malloc(sizeof(char*) * so_sen_cont);
+
+				// Initialize locations
+			for(int i = 0; i < so_sen_cont; i++){
+				so_sen_locations_array[i] = (char*) malloc(CHAR_LENGTH + 1);
+				memset(so_sen_locations_array[i],0,CHAR_LENGTH + 1);
+			}
 
 			soil_moisture_alert_counter = (int*) malloc(sizeof(int) * so_sen_cont);
 			soil_moisture_is_alerted = (bool*) malloc(sizeof(bool) * so_sen_cont);
@@ -263,6 +272,20 @@ void so_sen_init(void){
 					gpios[0] = so_sen_gpios_array[i].a0;
 					gpios_manager_lock_gpios(gpios, SO_SEN_N_GPIOS, dump);
 					adc1_config_channel_atten(gpio_into_channel(gpios[0]), so_sen_atten);
+				}
+
+				char key[15];
+				char num[3];
+
+				for(int i = 0; i < so_sen_cont; i++){
+					size = 0;
+					strcpy(key, nvs_SO_SEN_LOCATIONS_key);
+					sprintf(num, "%d", i);
+					strcat(key,num);
+
+					nvs_app_get_string_value(key,NULL,&size);
+					if(size != 0)
+						nvs_app_get_string_value(key,so_sen_locations_array[i],&size);
 				}
 			}
 
@@ -306,6 +329,10 @@ int so_sen_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason
 
 	so_sen_gpios_array = (so_sen_gpios_t*) realloc(so_sen_gpios_array, sizeof(so_sen_gpios_t) * so_sen_cont);
 	so_sen_data_array = (so_sen_data_t*) realloc(so_sen_data_array, sizeof(so_sen_data_t) * so_sen_cont);
+	so_sen_locations_array = (char**) realloc(so_sen_locations_array, sizeof(char*) * so_sen_cont);
+
+	so_sen_locations_array[so_sen_cont - 1] = (char*) malloc(CHAR_LENGTH + 1);
+	memset(so_sen_locations_array[so_sen_cont - 1],0,CHAR_LENGTH + 1);
 
 	soil_moisture_alert_counter = (int*) realloc(soil_moisture_alert_counter, sizeof(int) * so_sen_cont);
 	soil_moisture_is_alerted = (bool*) realloc(soil_moisture_is_alerted, sizeof(bool) * so_sen_cont);
@@ -314,11 +341,24 @@ int so_sen_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason
 
 	so_sen_data_array[so_sen_cont - 1].soil_moisture_percentage = 0.0;
 
+	strcpy(so_sen_locations_array[so_sen_cont - 1], "");
+
 	soil_moisture_alert_counter[so_sen_cont - 1] = 0;
 	soil_moisture_is_alerted[so_sen_cont - 1] = false;
 
 	nvs_app_set_uint8_value(nvs_SO_SEN_CONT_key,(uint8_t)so_sen_cont);
 	nvs_app_set_blob_value(nvs_SO_SEN_GPIOS_key,so_sen_gpios_array,sizeof(so_sen_gpios_t)*so_sen_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < so_sen_cont; i++){
+		strcpy(key, nvs_SO_SEN_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,so_sen_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_so_sen);
 
@@ -353,6 +393,8 @@ int so_sen_delete_sensor(int pos, char* reason){
 
 		so_sen_data_array[pos].soil_moisture_percentage = so_sen_data_array[pos + 1].soil_moisture_percentage;
 
+		strcpy(so_sen_locations_array[pos], so_sen_locations_array[pos + 1]);
+
 		soil_moisture_alert_counter[pos] = soil_moisture_alert_counter[pos + 1];
 		soil_moisture_is_alerted[pos] = soil_moisture_is_alerted[pos + 1];
 	}
@@ -362,11 +404,25 @@ int so_sen_delete_sensor(int pos, char* reason){
 	so_sen_gpios_array = (so_sen_gpios_t*) realloc(so_sen_gpios_array, sizeof(so_sen_gpios_t) * so_sen_cont);
 	so_sen_data_array = (so_sen_data_t*) realloc(so_sen_data_array, sizeof(so_sen_data_t) * so_sen_cont);
 
+	free(so_sen_locations_array[so_sen_cont]);
+	so_sen_locations_array = (char**) realloc(so_sen_locations_array, sizeof(char*) * so_sen_cont);
+
 	soil_moisture_alert_counter = (int*) realloc(soil_moisture_alert_counter, sizeof(int) * so_sen_cont);
 	soil_moisture_is_alerted = (bool*) realloc(soil_moisture_is_alerted, sizeof(bool) * so_sen_cont);
 
 	nvs_app_set_uint8_value(nvs_SO_SEN_CONT_key,(uint8_t)so_sen_cont);
 	nvs_app_set_blob_value(nvs_SO_SEN_GPIOS_key,so_sen_gpios_array,sizeof(so_sen_gpios_t)*so_sen_cont);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < so_sen_cont; i++){
+		strcpy(key, nvs_SO_SEN_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,so_sen_locations_array[i]);
+	}
 
 	pthread_mutex_unlock(&mutex_so_sen);
 
@@ -421,6 +477,48 @@ int so_sen_set_gpios(int pos, int* gpios, char* reason){
 int so_sen_set_parameters(int pos, union sensor_value_u* parameters, char* reason){
 	sprintf(reason, "SO-SEN doesn't have parameters");
 	return -1;
+}
+
+int so_sen_set_location(int pos, char* location, char* reason){
+	if(!g_so_sen_initialized){
+		ESP_LOGE(TAG, "SO-SEN not initialized");
+		sprintf(reason, "SO-SEN not initialized");
+
+		return -1;
+	}
+
+	if(!check_valid_pos(pos)){
+		ESP_LOGE(TAG, "Position not valid");
+		sprintf(reason, "Position not valid");
+
+		return -1;
+	}
+
+	if(strlen(location) >= CHAR_LENGTH){
+		ESP_LOGE(TAG, "Location too long (20 characters max)");
+		sprintf(reason, "Location too long (20 characters max)");
+
+		return -1;
+	}
+
+	pthread_mutex_lock(&mutex_so_sen);
+
+	strcpy(so_sen_locations_array[pos], location);
+
+	char key[15];
+	char num[3];
+
+	for(int i = 0; i < so_sen_cont; i++){
+		strcpy(key, nvs_SO_SEN_LOCATIONS_key);
+		sprintf(num, "%d", i);
+		strcat(key,num);
+
+		nvs_app_set_string_value(key,so_sen_locations_array[i]);
+	}
+
+	pthread_mutex_unlock(&mutex_so_sen);
+
+	return 1;
 }
 
 int so_sen_set_alert_values(int value, bool alert, int n_ticks, union sensor_value_u upper_threshold, union sensor_value_u lower_threshold, char* reason){
@@ -486,6 +584,7 @@ sensor_data_t* so_sen_get_sensors_data(int* number_of_sensors){
 		aux2 = (sensor_value_t*) malloc(sizeof(sensor_value_t) * SO_SEN_N_VALUES);
 
 		strcpy(aux[0].sensorName, "SO-SEN");
+		strcpy(aux[0].sensorLocation, "N/A");
 		aux[0].valuesLen = SO_SEN_N_VALUES;
 		aux[0].sensor_values = aux2;
 
@@ -507,6 +606,7 @@ sensor_data_t* so_sen_get_sensors_data(int* number_of_sensors){
 			aux2 = (sensor_value_t *)malloc(sizeof(sensor_value_t) * SO_SEN_N_VALUES);
 
 			strcpy(aux[i].sensorName, "SO-SEN");
+			strcpy(aux[i].sensorLocation, so_sen_locations_array[i]);
 			aux[i].valuesLen = SO_SEN_N_VALUES;
 			aux[i].sensor_values = aux2;
 
