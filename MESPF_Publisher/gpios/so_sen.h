@@ -94,6 +94,13 @@ int so_sen_set_gpios(int pos, int* gpios, char* reason);
 int so_sen_set_parameters(int pos, union sensor_value_u* parameters, char* reason);
 
 /**
+ * Change location of a sensor
+ *
+ * Note: return 1 when it happens successfully, -1 in other cases
+ */
+int so_sen_set_location(int pos, char* location, char* reason);
+
+/**
  * Change the alert values
  *
  * Note: return 1 when it happens successfully, -1 in other cases
