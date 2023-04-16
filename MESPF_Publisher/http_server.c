@@ -414,6 +414,23 @@ static esp_err_t SensorsParameters_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
+static esp_err_t SensorsLocations_handler(httpd_req_t *req){
+
+	ESP_LOGI(TAG, "SensorsLocations requested");
+
+	char sensorsLocationsJSON[1024];
+	memset(&sensorsLocationsJSON, 0, 1024);
+
+	get_sensors_locations_cjson(sensorsLocationsJSON);
+
+	//ESP_LOGI(TAG, "JSON: %s", sensorsJSON);
+
+	httpd_resp_set_type(req, HTTPD_TYPE_JSON);
+	httpd_resp_send(req, sensorsLocationsJSON, strlen(sensorsLocationsJSON));
+
+	return ESP_OK;
+}
+
 static esp_err_t SensorsAlerts_handler(httpd_req_t *req){
 
 	ESP_LOGI(TAG, "SensorsAlerts requested");
@@ -669,6 +686,41 @@ static esp_err_t SensorEditAlerts_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
+static esp_err_t SensorEditLocation_handler(httpd_req_t *req){
+	char buf[500], response[100], *location, reason[50];
+	int recv_len, i, j, length;
+
+	recv_len = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
+
+	if(recv_len >= sizeof(buf)) sprintf(response,"Too long parameters!");
+	else {
+		i =  atoi(strtok(buf,"\n"));
+
+		j = atoi(strtok(NULL,"\n"));
+
+		length = atoi(strtok(NULL,"\n"));
+
+		location = (char*) malloc(length+1);
+
+		if(length > 0)
+			strcpy(location, strtok(NULL,"\n"));
+		else
+			strcpy(location, "");
+
+		if(sensors_manager_set_location(i - 1, j, location, reason) == 1)
+			sprintf(response,"Location changed");
+		else
+			sprintf(response,"Error, Location not changed.\nReason: %s", reason);
+
+		free(location);
+	}
+
+	httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+	httpd_resp_send(req, response, strlen(response));
+
+	return ESP_OK;
+}
+
 /**
  * Sets up default httpd server configuration
  * @return http server instance handle if successful, NULL otherwise
@@ -815,6 +867,14 @@ static httpd_handle_t http_server_configure(void){
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorsParameters));
 
+	    httpd_uri_t SensorsLocations = {
+			.uri = "/SensorsLocations",
+			.method = HTTP_GET,
+			.handler = SensorsLocations_handler,
+			.user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorsLocations));
+
 	    httpd_uri_t SensorsAlerts = {
 			.uri = "/SensorsAlerts",
 			.method = HTTP_GET,
@@ -870,6 +930,14 @@ static httpd_handle_t http_server_configure(void){
 			.user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorEditAlerts));
+
+	    httpd_uri_t SensorEditLocation = {
+			.uri = "/SensorEditLocation",
+			.method = HTTP_POST,
+			.handler = SensorEditLocation_handler,
+			.user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorEditLocation));
 
 		return http_server_handle;
 	}
