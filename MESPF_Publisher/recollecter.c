@@ -198,6 +198,43 @@ void get_sensors_configuration_cjson(char *data){
 	cJSON_Delete(jobj);
 }
 
+void get_sensors_locations_cjson(char *data){
+	char aux[CHAR_LENGTH];
+	int number_of_sensors, cont = get_recollecters_size();
+	sensor_data_t* sensor_data;
+	cJSON *jobj, *sensorArray;
+
+	jobj = cJSON_CreateObject();
+
+	for(int i = 0; i < cont; i++){
+
+		sensor_data = get_sensor_data(i, &number_of_sensors);
+
+		itoa(i, aux, 10);
+
+		if(sensor_data != NULL && number_of_sensors > 0){
+
+			sensorArray = cJSON_AddArrayToObject(jobj, aux);
+
+			for(int j = 0; j < number_of_sensors; j++){
+				cJSON_AddItemToArray(sensorArray, cJSON_CreateString(sensor_data[j].sensorLocation));
+			}
+
+			// Free memory
+			for(int j = 0; j < number_of_sensors; j++){
+				free(sensor_data[j].sensor_values);
+			}
+			free(sensor_data);
+		}
+		else{
+			cJSON_AddNullToObject(jobj, aux);
+		}
+	}
+
+	strcpy(data, cJSON_Print(jobj));
+	cJSON_Delete(jobj);
+}
+
 void get_sensors_values_cjson(char *data){
 	char aux[CHAR_LENGTH];
 	int number_of_sensors, cont = get_recollecters_size();
