@@ -1,7 +1,7 @@
 A través de este comando es posible conocer la configuración de un sensor ya instalado en formato JSON.
 Se obtendrán la siguiente información:
 
-- Umbrales de Alarma: Campos "UTX" (umbral superior) y "LTX" (umbral superior), siendo X el número de valor, por ejemplo el DHT22 tiene dos valores (Temperatura y Humedad),
+- Umbrales de Alarma y ENABLE: Campos "ENX"(enable) que indica si está activada la alarma, "UTX" (umbral superior) y "LTX" (umbral superior), siendo X el número de valor, por ejemplo el DHT22 tiene dos valores (Temperatura y Humedad),
 siendo UT1 y LT1 para la temperatura, y UT2 y LT2 para la humedad.
 - GPIOS conectados. Por ejemplo para el MQ2 saldría el campo "A0", mientras que para el HC-RS04 saldrán "Trig" y "Echo".
 - Parametros adicionales (en caso de que los tuvieran). Por ejemplo, para el HC-RS04 saldrán "Sensor - Tank (cm)" y "Tank depth (cm)"
