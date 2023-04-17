@@ -122,17 +122,20 @@ void mqtt_app_scan_command(char* src){
 	mqtt_app_send_message(MQTT_APP_MSG_PUBLISH_DATA, topic, data);
 }
 
-void mqtt_app_send_alert(char* sensor_name, int id, char* dt){
+void mqtt_app_send_alert(char* sensor_name, int pos, int id, char* dt){
 	char topic[MQTT_APP_MAX_TOPIC_LENGTH];
 	char data[MQTT_APP_MAX_DATA_LENGTH];
 	char personal_name[MQTT_APP_MAX_DATA_LENGTH];
-	char aux[sizeof(int)];
+	char aux[CHAR_LENGTH];
 
 	memset(&topic,0,MQTT_APP_MAX_TOPIC_LENGTH);
 	memset(&data,0,MQTT_APP_MAX_DATA_LENGTH);
 
 	mqtt_app_getID(personal_name);
-	concatenate_topic(SENSORS_TOPIC, personal_name, sensor_name, "1", ALERT_TOPIC, NULL, NULL, topic);
+	sprintf(aux,"%d",pos + 1);
+	concatenate_topic(SENSORS_TOPIC, personal_name, sensor_name, aux, ALERT_TOPIC, NULL, NULL, topic);
+
+	memset(&aux, 0, CHAR_LENGTH);
 
 	strcpy(data, "{\"ID\":");
 	sprintf(aux, "%d",id);
@@ -146,11 +149,10 @@ void mqtt_app_send_alert(char* sensor_name, int id, char* dt){
 
 void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 	struct cJSON *jobj, *aux;
-	char src[SET_COMMAND_SRC], arg1[CHAR_LENGTH], arg2[CHAR_LENGTH],arg3[CHAR_LENGTH],arg4[CHAR_LENGTH], arg5[CHAR_LENGTH], auxC[CHAR_LENGTH], reason[50];
+	char src[SET_COMMAND_SRC], arg1[CHAR_LENGTH], arg2[CHAR_LENGTH],arg3[CHAR_LENGTH],arg4[CHAR_LENGTH], auxC[CHAR_LENGTH], reason[50];
 	int id, opt, resp, sensor_id, num_sensors, i;
-	int value, ticks;
+	int value,gpios[5];
 	bool enable;
-	int gpios[5];
 	sensor_data_t *sensor_data;
 	union sensor_value_u sensor_value[5];
 	sensor_additional_parameters_info_t *sensor_parameters;
@@ -273,24 +275,6 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 	}
 	strcpy(arg4,cJSON_GetStringValue(aux));
 
-
-	resp = -105;
-	if (!cJSON_HasObjectItem(jobj,"ARG5")){
-		ESP_LOGE(TAG2, "mqtt_app_process_set_command, ARG4 not defined!");
-		cJSON_Delete(jobj);
-		mqtt_app_send_resp(src,id,resp);
-		return;
-	}
-	aux = cJSON_GetObjectItem(jobj,"ARG5");
-	if(!cJSON_IsString(aux) || (strlen(cJSON_GetStringValue(aux)) >= CHAR_LENGTH)){
-		ESP_LOGE(TAG2, "mqtt_app_process_set_command, ARG5 is not STRING or too long!");
-		cJSON_Delete(jobj);
-		mqtt_app_send_resp(src,id,resp);
-		return;
-	}
-	strcpy(arg5,cJSON_GetStringValue(aux));
-
-
 	resp = -106;
 	sensor_id = get_sensor_id_by_name(sensor_name);
 	if (sensor_id < 1){
@@ -328,21 +312,20 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 		case 0:
 			value = atoi(arg1);
 			enable = (strcmp(arg2,"0") == 0) ? 0 : 1;
-			ticks = atoi(arg3);
 
-			if (value < sensor_data->valuesLen && value >= 0){
+			if (value < sensor_data[0].valuesLen && value >= 0){
 				if (sensor_data[0].sensor_values[value].sensor_value_type == INTEGER){
-					sensor_value[0].ival = atoi(arg4);
-					sensor_value[1].ival = atoi(arg5);
+					sensor_value[0].ival = atoi(arg3);
+					sensor_value[1].ival = atoi(arg4);
 				}else if (sensor_data[0].sensor_values[value].sensor_value_type == FLOAT){
-					sensor_value[0].fval = atof(arg4);
-					sensor_value[1].fval = atof(arg5);
+					sensor_value[0].fval = atof(arg3);
+					sensor_value[1].fval = atof(arg4);
 				}else {
-					strcpy(sensor_value[0].cval, arg4);
-					strcpy(sensor_value[1].cval, arg5);
+					strcpy(sensor_value[0].cval, arg3);
+					strcpy(sensor_value[1].cval, arg4);
 				}
 				ESP_LOGE(TAG2,"mqtt_app_set_command, sensor_id: %d", sensor_id);
-				resp = sensors_manager_set_alert_values(sensor_id - 1,value,enable,ticks, sensor_value[0], sensor_value[1], reason);
+				resp = sensors_manager_set_alert_values(sensor_id - 1,value,enable,sensor_data[0].sensor_values[value].ticks_to_alert, sensor_value[0], sensor_value[1], reason);
 			}
 			else {
 				resp = -109;
@@ -354,7 +337,6 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 			gpios[1] = atoi(arg2);
 			gpios[2] = atoi(arg3);
 			gpios[3] = atoi(arg4);
-			gpios[4] = atoi(arg5);
 			resp = sensors_manager_set_gpios(sensor_id - 1, sensor_unit,gpios,reason);
 			break;
 
@@ -374,7 +356,6 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 					if (i == 1) strcpy(auxC,arg2);
 					if (i == 2) strcpy(auxC,arg3);
 					if (i == 3) strcpy(auxC,arg4);
-					if (i == 4) strcpy(auxC,arg5);
 
 					if (sensor_parameters[0].sensor_parameters[i].sensor_parameter_type == INTEGER){
 						sensor_value[i].ival = atoi(auxC);
@@ -405,7 +386,7 @@ void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data){
 
 void mqtt_app_getconf_command(char *sensor_name,int sensor_unit,char *data){
 	struct cJSON *jobj, *aux;
-	char topic[MQTT_APP_MAX_TOPIC_LENGTH],src[SET_COMMAND_SRC],objName[CHAR_LENGTH],objName2[CHAR_LENGTH], *conf;
+	char topic[MQTT_APP_MAX_TOPIC_LENGTH],src[SET_COMMAND_SRC],objName[CHAR_LENGTH],objName2[CHAR_LENGTH],objName3[CHAR_LENGTH] , *conf;
 	int sensor_id,num_sensors, i, id, resp;
 	sensor_gpios_info_t *gpios_info;
 	sensor_additional_parameters_info_t *parameters_info;
@@ -465,7 +446,10 @@ void mqtt_app_getconf_command(char *sensor_name,int sensor_unit,char *data){
 			sprintf(objName,"UT%d",i+1);
 			memset(objName2,0,CHAR_LENGTH);
 			sprintf(objName2,"LT%d",i+1);
+			memset(objName3,0,CHAR_LENGTH);
+			sprintf(objName3,"EN%d",i+1);
 
+			cJSON_AddBoolToObject(jobj,objName3,data_info[0].sensor_values[i].alert);
 			switch (data_info[0].sensor_values[i].sensor_value_type){
 				case INTEGER:
 					cJSON_AddNumberToObject(jobj,objName,data_info[0].sensor_values[i].upper_threshold.ival);
