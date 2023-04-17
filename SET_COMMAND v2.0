@@ -16,8 +16,7 @@ El mensaje en JSON tendrá la siguiente estructura:
 "ARG1": "123",
 "ARG2": "456",
 "ARG3": "789",
-"ARG4": "012",
-"ARG5": "345"
+"ARG4": "012"
 }
 
 Siendo:
@@ -41,11 +40,9 @@ OPERACIÓN 0: Cambio de los valores de la alarma.
 
   ARG2: Se indicará con "1" que se quiere activar la alarma, y con "0" que se desactiva.
 
-  ARG3: Ticks de la alarma.
+  ARG3: Umbral superior de la alarma (UPPER_THRESHOLD), dependerá del tipo de valor que use el sensor
 
-  ARG4: Umbral superior de la alarma (UPPER_THRESHOLD), dependerá del tipo de valor que use el sensor
-
-  ARG5: Umbral superior de la alarma (LOWER_THRESHOLD)
+  ARG4: Umbral superior de la alarma (LOWER_THRESHOLD)
 
 Ejemplo 1 de llamada: Para el MQ2, activar la alarma del único valor que tiene (que es un FLOAT) para que suene la alarma en caso de que se sobrepase el 60%
 Tópico: MESPF/SENS/ESP32_X/MQ2/1/CMD/SET
@@ -57,8 +54,7 @@ Mensaje:
 "ARG1": "0",
 "ARG2": "1",
 "ARG3": "10",
-"ARG4": "60.0",
-"ARG5": "0.0"
+"ARG4": "60.0"
 }
 
 Ejemplo 2 de llamada: Para el DHT22, activar la alarma del segundo valor (Temperatura, FLOAT) para que suene la alarm en caso de que sea muy baja o muy alta:
@@ -71,8 +67,7 @@ Mensaje:
 "ARG1": "1",
 "ARG2": "1",
 "ARG3": "10",
-"ARG4": "50.2",
-"ARG5": "-10.5"
+"ARG4": "50.2"
 }
 
 NOTA: Actualmente los umbrales de alarma son comunes a todos los sensores del mismo tipo, por lo que no importa si se publica el mensaje en:
@@ -92,8 +87,7 @@ Mensaje:
 "ARG1": "22",
 "ARG2": "0",
 "ARG3": "0",
-"ARG4": "0",
-"ARG5": "0"
+"ARG4": "0"
 }
 
 Ejemplo 2 de llamada: Para el HC-RS04 número 7, informar que los GPIOS a los que están conectados TRIG y ECHO son el 15 y el 16, respectivamente:
@@ -106,8 +100,7 @@ Mensaje:
 "ARG1": "15",
 "ARG2": "16",
 "ARG3": "0",
-"ARG4": "0",
-"ARG5": "0"
+"ARG4": "0"
 }
 
 
@@ -127,8 +120,7 @@ Mensaje:
 "ARG1": "30",
 "ARG2": "200",
 "ARG3": "0",
-"ARG4": "0",
-"ARG5": "0"
+"ARG4": "0"
 }
 
 
@@ -150,7 +142,6 @@ Siendo Y el ID enviado en el campo "ID" del comando, y Z el código del resultad
 - -102: El campo "ARG2" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
 - -103: El campo "ARG3" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
 - -104: El campo "ARG4" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
-- -105: El campo "ARG5" no se ha definido, no es un STRING o es muy largo (más de 20 caracteres).
 - -106: No se ha encontrado el ID del Sensor, esto quiere decir que se ha intentado modificar un TIPO de sensor que no se ha instalado.
 - -107: No se ha encontrado el Sensor_data del Sensor, igual que lo anterior.
 - -108: No hay sensores instalados de ese tipo o se ha intentado modificar un número de sensor incorrecto. Por ejemplo si se intena modificar el DHT22 número 2
