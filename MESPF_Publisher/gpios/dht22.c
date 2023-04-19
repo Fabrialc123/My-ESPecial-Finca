@@ -44,11 +44,11 @@ static dht22_alerts_t dht22_alerts;
 
 	/* Humidity */
 static int* humidity_alert_counter;
-static bool* humidity_is_alerted;
+static int* humidity_last_alert_counter;
 
 	/* Temperature */
 static int* temperature_alert_counter;
-static bool* temperature_is_alerted;
+static int* temperature_last_alert_counter;
 
 // NVS keys
 
@@ -230,9 +230,9 @@ static void dht22_task(void *pvParameters){
 			if(dht22_alerts.humidity_alert){
 
 				// Update counter
-				if((dht22_data_array[x].humidity < dht22_alerts.humidity_lower_threshold) && (humidity_alert_counter[x] > -dht22_alerts.humidity_ticks_to_alert))
+				if(dht22_data_array[x].humidity < dht22_alerts.humidity_lower_threshold)
 					humidity_alert_counter[x]--;
-				else if((dht22_data_array[x].humidity > dht22_alerts.humidity_upper_threshold) && (humidity_alert_counter[x] < dht22_alerts.humidity_ticks_to_alert))
+				else if(dht22_data_array[x].humidity > dht22_alerts.humidity_upper_threshold)
 					humidity_alert_counter[x]++;
 				else{
 					if(humidity_alert_counter[x] > 0)
@@ -241,25 +241,30 @@ static void dht22_task(void *pvParameters){
 						humidity_alert_counter[x]++;
 				}
 
-				// Check if the value can be alerted again
-				if((humidity_alert_counter[x] == 0) && humidity_is_alerted[x]){
-					humidity_is_alerted[x] = false;
-				}
+				// Update last alert counter
+				if(humidity_last_alert_counter[x] < DHT22_STABILIZED_TICKS)
+					humidity_last_alert_counter[x]++;
 
 				// Check if it is the moment to alert
-				if((humidity_alert_counter[x] == -dht22_alerts.humidity_ticks_to_alert) && !humidity_is_alerted[x]){
+				if(humidity_alert_counter[x] == -dht22_alerts.humidity_ticks_to_alert){
 
-					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on lower threshold (value: humidity)");
+					if(humidity_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
+						msg_id++;
 
-					humidity_is_alerted[x] = true;
-					msg_id++;
+					mqtt_app_send_alert("DHT22", x, msg_id, "WARNING! exceed on lower threshold (value: humidity)");
+
+					humidity_alert_counter[x] = 0;
+					humidity_last_alert_counter[x] = 0;
 				}
-				else if((humidity_alert_counter[x] == dht22_alerts.humidity_ticks_to_alert) && !humidity_is_alerted[x]){
+				else if(humidity_alert_counter[x] == dht22_alerts.humidity_ticks_to_alert){
 
-					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on upper threshold (value: humidity)");
+					if(humidity_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
+						msg_id++;
 
-					humidity_is_alerted[x] = true;
-					msg_id++;
+					mqtt_app_send_alert("DHT22", x, msg_id, "WARNING! exceed on upper threshold (value: humidity)");
+
+					humidity_alert_counter[x] = 0;
+					humidity_last_alert_counter[x] = 0;
 				}
 			}
 
@@ -267,9 +272,9 @@ static void dht22_task(void *pvParameters){
 			if(dht22_alerts.temperature_alert){
 
 				// Update counter
-				if((dht22_data_array[x].temperature < dht22_alerts.temperature_lower_threshold) && (temperature_alert_counter[x] > -dht22_alerts.temperature_ticks_to_alert))
+				if(dht22_data_array[x].temperature < dht22_alerts.temperature_lower_threshold)
 					temperature_alert_counter[x]--;
-				else if((dht22_data_array[x].temperature > dht22_alerts.temperature_upper_threshold) && (temperature_alert_counter[x] < dht22_alerts.temperature_ticks_to_alert))
+				else if(dht22_data_array[x].temperature > dht22_alerts.temperature_upper_threshold)
 					temperature_alert_counter[x]++;
 				else{
 					if(temperature_alert_counter[x] > 0)
@@ -278,25 +283,30 @@ static void dht22_task(void *pvParameters){
 						temperature_alert_counter[x]++;
 				}
 
-				// Check if the value can be alerted again
-				if((temperature_alert_counter[x] == 0) && temperature_is_alerted[x]){
-					temperature_is_alerted[x] = false;
-				}
+				// Update last alert counter
+				if(temperature_last_alert_counter[x] < DHT22_STABILIZED_TICKS)
+					temperature_last_alert_counter[x]++;
 
 				// Check if it is the moment to alert
-				if((temperature_alert_counter[x] == -dht22_alerts.temperature_ticks_to_alert) && !temperature_is_alerted[x]){
+				if(temperature_alert_counter[x] == -dht22_alerts.temperature_ticks_to_alert){
 
-					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on lower threshold (value: temperature)");
+					if(temperature_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
+						msg_id++;
 
-					temperature_is_alerted[x] = true;
-					msg_id++;
+					mqtt_app_send_alert("DHT22", x, msg_id, "WARNING! exceed on lower threshold (value: temperature)");
+
+					temperature_alert_counter[x] = 0;
+					temperature_last_alert_counter[x] = 0;
 				}
-				else if((temperature_alert_counter[x] == dht22_alerts.temperature_ticks_to_alert) && !temperature_is_alerted[x]){
+				else if(temperature_alert_counter[x] == dht22_alerts.temperature_ticks_to_alert){
 
-					mqtt_app_send_alert("DHT22", msg_id, "WARNING in Sensor DHT22! exceed on upper threshold (value: temperature)");
+					if(temperature_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
+						msg_id++;
 
-					temperature_is_alerted[x] = true;
-					msg_id++;
+					mqtt_app_send_alert("DHT22", x, msg_id, "WARNING! exceed on upper threshold (value: temperature)");
+
+					temperature_alert_counter[x] = 0;
+					temperature_last_alert_counter[x] = 0;
 				}
 			}
 		}
@@ -342,10 +352,10 @@ void dht22_init(void){
 			}
 
 			humidity_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
-			humidity_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
+			humidity_last_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
 
 			temperature_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
-			temperature_is_alerted = (bool*) malloc(sizeof(bool) * dht22_cont);
+			temperature_last_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
 
 			// Initialize alerts
 			dht22_alerts.humidity_alert = false;
@@ -435,10 +445,10 @@ int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason)
 	memset(dht22_locations_array[dht22_cont - 1],0,CHAR_LENGTH + 1);
 
 	humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
-	humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
+	humidity_last_alert_counter = (int*) realloc(humidity_last_alert_counter, sizeof(int) * dht22_cont);
 
 	temperature_alert_counter = (int*) realloc(temperature_alert_counter, sizeof(int) * dht22_cont);
-	temperature_is_alerted = (bool*) realloc(temperature_is_alerted, sizeof(bool) * dht22_cont);
+	temperature_last_alert_counter = (int*) realloc(temperature_last_alert_counter, sizeof(int) * dht22_cont);
 
 	dht22_gpios_array[dht22_cont - 1].data = gpios[0];
 
@@ -448,10 +458,10 @@ int dht22_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason)
 	strcpy(dht22_locations_array[dht22_cont - 1], "");
 
 	humidity_alert_counter[dht22_cont - 1] = 0;
-	humidity_is_alerted[dht22_cont - 1] = false;
+	humidity_last_alert_counter[dht22_cont - 1] = 0;
 
 	temperature_alert_counter[dht22_cont - 1] = 0;
-	temperature_is_alerted[dht22_cont - 1] = false;
+	temperature_last_alert_counter[dht22_cont - 1] = 0;
 
 	nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
 	nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
@@ -504,10 +514,10 @@ int dht22_delete_sensor(int pos, char* reason){
 		strcpy(dht22_locations_array[pos], dht22_locations_array[pos + 1]);
 
 		humidity_alert_counter[pos] = humidity_alert_counter[pos + 1];
-		humidity_is_alerted[pos] = humidity_is_alerted[pos + 1];
+		humidity_last_alert_counter[pos] = humidity_last_alert_counter[pos + 1];
 
 		temperature_alert_counter[pos] = temperature_alert_counter[pos + 1];
-		temperature_is_alerted[pos] = temperature_is_alerted[pos + 1];
+		temperature_last_alert_counter[pos] = temperature_last_alert_counter[pos + 1];
 	}
 
 	dht22_cont--;
@@ -519,10 +529,10 @@ int dht22_delete_sensor(int pos, char* reason){
 	dht22_locations_array = (char**) realloc(dht22_locations_array, sizeof(char*) * dht22_cont);
 
 	humidity_alert_counter = (int*) realloc(humidity_alert_counter, sizeof(int) * dht22_cont);
-	humidity_is_alerted = (bool*) realloc(humidity_is_alerted, sizeof(bool) * dht22_cont);
+	humidity_last_alert_counter = (int*) realloc(humidity_last_alert_counter, sizeof(int) * dht22_cont);
 
 	temperature_alert_counter = (int*) realloc(temperature_alert_counter, sizeof(int) * dht22_cont);
-	temperature_is_alerted = (bool*) realloc(temperature_is_alerted, sizeof(bool) * dht22_cont);
+	temperature_last_alert_counter = (int*) realloc(temperature_last_alert_counter, sizeof(int) * dht22_cont);
 
 	nvs_app_set_uint8_value(nvs_DHT22_CONT_key,(uint8_t)dht22_cont);
 	nvs_app_set_blob_value(nvs_DHT22_GPIOS_key,dht22_gpios_array,sizeof(dht22_gpios_t)*dht22_cont);
