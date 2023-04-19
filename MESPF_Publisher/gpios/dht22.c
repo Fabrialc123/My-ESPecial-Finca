@@ -246,7 +246,7 @@ static void dht22_task(void *pvParameters){
 					humidity_last_alert_counter[x]++;
 
 				// Check if it is the moment to alert
-				if(humidity_alert_counter[x] == -dht22_alerts.humidity_ticks_to_alert){
+				if(humidity_alert_counter[x] <= -dht22_alerts.humidity_ticks_to_alert){
 
 					if(humidity_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
 						msg_id++;
@@ -256,7 +256,7 @@ static void dht22_task(void *pvParameters){
 					humidity_alert_counter[x] = 0;
 					humidity_last_alert_counter[x] = 0;
 				}
-				else if(humidity_alert_counter[x] == dht22_alerts.humidity_ticks_to_alert){
+				else if(humidity_alert_counter[x] >= dht22_alerts.humidity_ticks_to_alert){
 
 					if(humidity_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
 						msg_id++;
@@ -288,7 +288,7 @@ static void dht22_task(void *pvParameters){
 					temperature_last_alert_counter[x]++;
 
 				// Check if it is the moment to alert
-				if(temperature_alert_counter[x] == -dht22_alerts.temperature_ticks_to_alert){
+				if(temperature_alert_counter[x] <= -dht22_alerts.temperature_ticks_to_alert){
 
 					if(temperature_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
 						msg_id++;
@@ -298,7 +298,7 @@ static void dht22_task(void *pvParameters){
 					temperature_alert_counter[x] = 0;
 					temperature_last_alert_counter[x] = 0;
 				}
-				else if(temperature_alert_counter[x] == dht22_alerts.temperature_ticks_to_alert){
+				else if(temperature_alert_counter[x] >= dht22_alerts.temperature_ticks_to_alert){
 
 					if(temperature_last_alert_counter[x] == DHT22_STABILIZED_TICKS)
 						msg_id++;
@@ -342,7 +342,9 @@ void dht22_init(void){
 
 			// Initialize pointers
 			dht22_gpios_array = (dht22_gpios_t*) malloc(sizeof(dht22_gpios_t) * dht22_cont);
+			memset(dht22_gpios_array,0,sizeof(dht22_gpios_t) * dht22_cont);
 			dht22_data_array = (dht22_data_t*) malloc(sizeof(dht22_data_t) * dht22_cont);
+			memset(dht22_data_array,0,sizeof(dht22_data_t) * dht22_cont);
 			dht22_locations_array = (char**) malloc(sizeof(char*) * dht22_cont);
 
 				// Initialize locations
@@ -352,10 +354,14 @@ void dht22_init(void){
 			}
 
 			humidity_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
+			memset(humidity_alert_counter,0,sizeof(int) * dht22_cont);
 			humidity_last_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
+			memset(humidity_last_alert_counter,0,sizeof(int) * dht22_cont);
 
 			temperature_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
+			memset(temperature_alert_counter,0,sizeof(int) * dht22_cont);
 			temperature_last_alert_counter = (int*) malloc(sizeof(int) * dht22_cont);
+			memset(temperature_last_alert_counter,0,sizeof(int) * dht22_cont);
 
 			// Initialize alerts
 			dht22_alerts.humidity_alert = false;
