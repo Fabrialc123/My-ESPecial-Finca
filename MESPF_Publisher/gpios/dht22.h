@@ -55,6 +55,7 @@
 #define DHT22_N_ADDITIONAL_PARAMS			0
 
 #define DHT22_TIME_TO_UPDATE_DATA			500 // 100 = 1 second
+#define DHT22_STABILIZED_TICKS				18000 / DHT22_TIME_TO_UPDATE_DATA
 
 // LCD related defines (1 for each value)
 
