@@ -10,8 +10,8 @@ p {
 
 h1 {
     font-size: 4.0em;
-    margin-top: 42px;
-    margin-bottom: 42px;
+    margin-top: 26px;
+    margin-bottom: 41px;
 }
 
 h2 {
@@ -48,6 +48,7 @@ li:not(:last-child) {
 
 input[type=text], input[type=number] {
 	text-align: center;
+	height: 20px;
 }
 
 .row::after {
@@ -87,6 +88,11 @@ header {
 	border-color: black;
 }
 
+header .buttons {
+	text-align: right;
+	margin: 10px;
+}
+
 header h1 {
 	color: #4E270A;
 }
@@ -114,18 +120,11 @@ header .row {
 }
 
 #CONFIGURATIONS input[type=text], #CONFIGURATIONS input[type=number] {
-	width: 300px;
-	height: 20px;
+	width: 100%;
 }
 
-#SENSORS input[type=text] {
-	width: 200px;
-	height: 20px;
-}
-
-#SENSORS input[type=number] {
-	width: 80px;
-	height: 20px;
+#SENSORS input[type=text], #SENSORS input[type=number] {
+	width: 35%;
 }
 
 #OTA {
@@ -148,7 +147,7 @@ header .row {
 	font-family: "Times New Roman", Times, serif;
     text-align: center;
     padding: 10px;
-    width: 450px;
+    width: 25%;
     margin-top: 10px;
     margin-right: auto;
     margin-bottom: 10px;
