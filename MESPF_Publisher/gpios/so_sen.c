@@ -42,7 +42,7 @@ static so_sen_alerts_t so_sen_alerts;
 
 	/* Soil moisture */
 static int* soil_moisture_alert_counter;
-static bool* soil_moisture_is_alerted;
+static int* soil_moisture_last_alert_counter;
 
 // NVS keys
 
@@ -167,9 +167,9 @@ static void so_sen_task(void *pvParameters){
 			if(so_sen_alerts.soil_moisture_alert){
 
 				// Update counter
-				if((so_sen_data_array[i].soil_moisture_percentage < so_sen_alerts.soil_moisture_lower_threshold) && (soil_moisture_alert_counter[i] > -so_sen_alerts.soil_moisture_ticks_to_alert))
+				if(so_sen_data_array[i].soil_moisture_percentage < so_sen_alerts.soil_moisture_lower_threshold)
 					soil_moisture_alert_counter[i]--;
-				else if((so_sen_data_array[i].soil_moisture_percentage > so_sen_alerts.soil_moisture_upper_threshold) && (soil_moisture_alert_counter[i] < so_sen_alerts.soil_moisture_ticks_to_alert))
+				else if(so_sen_data_array[i].soil_moisture_percentage > so_sen_alerts.soil_moisture_upper_threshold)
 					soil_moisture_alert_counter[i]++;
 				else{
 					if(soil_moisture_alert_counter[i] > 0)
@@ -178,25 +178,30 @@ static void so_sen_task(void *pvParameters){
 						soil_moisture_alert_counter[i]++;
 				}
 
-				// Check if the value can be alerted again
-				if((soil_moisture_alert_counter[i] == 0) && soil_moisture_is_alerted[i]){
-					soil_moisture_is_alerted[i] = false;
-				}
+				// Update last alert counter
+				if(soil_moisture_last_alert_counter[i] < SO_SEN_STABILIZED_TICKS)
+					soil_moisture_last_alert_counter[i]++;
 
 				// Check if it is the moment to alert
-				if((soil_moisture_alert_counter[i] == -so_sen_alerts.soil_moisture_ticks_to_alert) && !soil_moisture_is_alerted[i]){
+				if(soil_moisture_alert_counter[i] == -so_sen_alerts.soil_moisture_ticks_to_alert){
 
-					mqtt_app_send_alert("SO_SEN", msg_id, "WARNING in Sensor SO_SEN! exceed on lower threshold (value: soil_moisture_percentage)");
+					if(soil_moisture_last_alert_counter[i] == SO_SEN_STABILIZED_TICKS)
+						msg_id++;
 
-					soil_moisture_is_alerted[i] = true;
-					msg_id++;
+					mqtt_app_send_alert("SO_SEN", i, msg_id, "WARNING! exceed on lower threshold (value: soil_moisture_percentage)");
+
+					soil_moisture_alert_counter[i] = 0;
+					soil_moisture_last_alert_counter[i] = 0;
 				}
-				else if((soil_moisture_alert_counter[i] == so_sen_alerts.soil_moisture_ticks_to_alert) && !soil_moisture_is_alerted[i]){
+				else if(soil_moisture_alert_counter[i] == so_sen_alerts.soil_moisture_ticks_to_alert){
 
-					mqtt_app_send_alert("SO_SEN", msg_id, "WARNING in Sensor SO_SEN! exceed on upper threshold (value: soil_moisture_percentage)");
+					if(soil_moisture_last_alert_counter[i] == SO_SEN_STABILIZED_TICKS)
+						msg_id++;
 
-					soil_moisture_is_alerted[i] = true;
-					msg_id++;
+					mqtt_app_send_alert("SO_SEN", i, msg_id, "WARNING! exceed on upper threshold (value: soil_moisture_percentage)");
+
+					soil_moisture_alert_counter[i] = 0;
+					soil_moisture_last_alert_counter[i] = 0;
 				}
 			}
 		}
@@ -242,7 +247,7 @@ void so_sen_init(void){
 			}
 
 			soil_moisture_alert_counter = (int*) malloc(sizeof(int) * so_sen_cont);
-			soil_moisture_is_alerted = (bool*) malloc(sizeof(bool) * so_sen_cont);
+			soil_moisture_last_alert_counter = (int*) malloc(sizeof(int) * so_sen_cont);
 
 			// Initialize adc1 width
 			adc1_config_width(so_sen_width);
@@ -335,7 +340,7 @@ int so_sen_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason
 	memset(so_sen_locations_array[so_sen_cont - 1],0,CHAR_LENGTH + 1);
 
 	soil_moisture_alert_counter = (int*) realloc(soil_moisture_alert_counter, sizeof(int) * so_sen_cont);
-	soil_moisture_is_alerted = (bool*) realloc(soil_moisture_is_alerted, sizeof(bool) * so_sen_cont);
+	soil_moisture_last_alert_counter = (int*) realloc(soil_moisture_last_alert_counter, sizeof(int) * so_sen_cont);
 
 	so_sen_gpios_array[so_sen_cont - 1].a0 = gpios[0];
 
@@ -344,7 +349,7 @@ int so_sen_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason
 	strcpy(so_sen_locations_array[so_sen_cont - 1], "");
 
 	soil_moisture_alert_counter[so_sen_cont - 1] = 0;
-	soil_moisture_is_alerted[so_sen_cont - 1] = false;
+	soil_moisture_last_alert_counter[so_sen_cont - 1] = 0;
 
 	nvs_app_set_uint8_value(nvs_SO_SEN_CONT_key,(uint8_t)so_sen_cont);
 	nvs_app_set_blob_value(nvs_SO_SEN_GPIOS_key,so_sen_gpios_array,sizeof(so_sen_gpios_t)*so_sen_cont);
@@ -396,7 +401,7 @@ int so_sen_delete_sensor(int pos, char* reason){
 		strcpy(so_sen_locations_array[pos], so_sen_locations_array[pos + 1]);
 
 		soil_moisture_alert_counter[pos] = soil_moisture_alert_counter[pos + 1];
-		soil_moisture_is_alerted[pos] = soil_moisture_is_alerted[pos + 1];
+		soil_moisture_last_alert_counter[pos] = soil_moisture_last_alert_counter[pos + 1];
 	}
 
 	so_sen_cont--;
@@ -408,7 +413,7 @@ int so_sen_delete_sensor(int pos, char* reason){
 	so_sen_locations_array = (char**) realloc(so_sen_locations_array, sizeof(char*) * so_sen_cont);
 
 	soil_moisture_alert_counter = (int*) realloc(soil_moisture_alert_counter, sizeof(int) * so_sen_cont);
-	soil_moisture_is_alerted = (bool*) realloc(soil_moisture_is_alerted, sizeof(bool) * so_sen_cont);
+	soil_moisture_last_alert_counter = (int*) realloc(soil_moisture_last_alert_counter, sizeof(int) * so_sen_cont);
 
 	nvs_app_set_uint8_value(nvs_SO_SEN_CONT_key,(uint8_t)so_sen_cont);
 	nvs_app_set_blob_value(nvs_SO_SEN_GPIOS_key,so_sen_gpios_array,sizeof(so_sen_gpios_t)*so_sen_cont);
