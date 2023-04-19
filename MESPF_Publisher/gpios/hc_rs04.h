@@ -19,6 +19,7 @@
 #define HC_RS04_N_ADDITIONAL_PARAMS			2
 
 #define HC_RS04_TIME_TO_UPDATE_DATA			500 		// 100 = 1 second
+#define HC_RS04_STABILIZED_TICKS			18000 / HC_RS04_TIME_TO_UPDATE_DATA
 
 // LCD related defines (1 for each value)
 
