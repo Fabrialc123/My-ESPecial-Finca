@@ -203,7 +203,7 @@ static void hc_rs04_task(void *pvParameters){
 					water_level_last_alert_counter[i]++;
 
 				// Check if it is the moment to alert
-				if(water_level_alert_counter[i] == -hc_rs04_alerts.water_level_ticks_to_alert){
+				if(water_level_alert_counter[i] <= -hc_rs04_alerts.water_level_ticks_to_alert){
 
 					if(water_level_last_alert_counter[i] == HC_RS04_STABILIZED_TICKS)
 						msg_id++;
@@ -213,7 +213,7 @@ static void hc_rs04_task(void *pvParameters){
 					water_level_alert_counter[i] = 0;
 					water_level_last_alert_counter[i] = 0;
 				}
-				else if(water_level_alert_counter[i] == hc_rs04_alerts.water_level_ticks_to_alert){
+				else if(water_level_alert_counter[i] >= hc_rs04_alerts.water_level_ticks_to_alert){
 
 					if(water_level_last_alert_counter[i] == HC_RS04_STABILIZED_TICKS)
 						msg_id++;
@@ -257,8 +257,11 @@ void hc_rs04_init(void){
 
 			// Initialize pointers
 			hc_rs04_additional_params_array = (hc_rs04_additional_params_t*) malloc(sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
+			memset(hc_rs04_additional_params_array,0,sizeof(hc_rs04_additional_params_t) * hc_rs04_cont);
 			hc_rs04_gpios_array = (hc_rs04_gpios_t*) malloc(sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
+			memset(hc_rs04_gpios_array,0,sizeof(hc_rs04_gpios_t) * hc_rs04_cont);
 			hc_rs04_data_array = (hc_rs04_data_t*) malloc(sizeof(hc_rs04_data_t) * hc_rs04_cont);
+			memset(hc_rs04_data_array,0,sizeof(hc_rs04_data_t) * hc_rs04_cont);
 			hc_rs04_locations_array = (char**) malloc(sizeof(char*) * hc_rs04_cont);
 
 				// Initialize locations
@@ -268,7 +271,9 @@ void hc_rs04_init(void){
 			}
 
 			water_level_alert_counter = (int*) malloc(sizeof(int) * hc_rs04_cont);
+			memset(water_level_alert_counter,0,sizeof(int) * hc_rs04_cont);
 			water_level_last_alert_counter = (int*) malloc(sizeof(int) * hc_rs04_cont);
+			memset(water_level_last_alert_counter,0,sizeof(int) * hc_rs04_cont);
 
 			// Initialize alerts
 			hc_rs04_alerts.water_level_alert = false;
