@@ -20,6 +20,7 @@
 #define SO_SEN_N_ADDITIONAL_PARAMS				0
 
 #define SO_SEN_TIME_TO_UPDATE_DATA				500	// 100 = 1 second
+#define SO_SEN_STABILIZED_TICKS					18000 / SO_SEN_TIME_TO_UPDATE_DATA
 
 // LCD related defines (1 for each value)
 
