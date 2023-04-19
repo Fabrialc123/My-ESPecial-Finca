@@ -42,7 +42,7 @@ static mq2_alerts_t mq2_alerts;
 
 	/* Smoke/Gas */
 static int* smoke_gas_alert_counter;
-static bool* smoke_gas_is_alerted;
+static int* smoke_gas_last_alert_counter;
 
 // NVS keys
 
@@ -167,9 +167,9 @@ static void mq2_task(void *pvParameters){
 			if(mq2_alerts.smoke_gas_alert){
 
 				// Update counter
-				if((mq2_data_array[i].smoke_gas_percentage < mq2_alerts.smoke_gas_lower_threshold) && (smoke_gas_alert_counter[i] > -mq2_alerts.smoke_gas_ticks_to_alert))
+				if(mq2_data_array[i].smoke_gas_percentage < mq2_alerts.smoke_gas_lower_threshold)
 					smoke_gas_alert_counter[i]--;
-				else if((mq2_data_array[i].smoke_gas_percentage > mq2_alerts.smoke_gas_upper_threshold) && (smoke_gas_alert_counter[i] < mq2_alerts.smoke_gas_ticks_to_alert))
+				else if(mq2_data_array[i].smoke_gas_percentage > mq2_alerts.smoke_gas_upper_threshold)
 					smoke_gas_alert_counter[i]++;
 				else{
 					if(smoke_gas_alert_counter[i] > 0)
@@ -178,25 +178,30 @@ static void mq2_task(void *pvParameters){
 						smoke_gas_alert_counter[i]++;
 				}
 
-				// Check if the value can be alerted again
-				if((smoke_gas_alert_counter[i] == 0) && smoke_gas_is_alerted[i]){
-					smoke_gas_is_alerted[i] = false;
-				}
+				// Update last alert counter
+				if(smoke_gas_last_alert_counter[i] < MQ2_STABILIZED_TICKS)
+					smoke_gas_last_alert_counter[i]++;
 
 				// Check if it is the moment to alert
-				if((smoke_gas_alert_counter[i] == -mq2_alerts.smoke_gas_ticks_to_alert) && !smoke_gas_is_alerted[i]){
+				if(smoke_gas_alert_counter[i] == -mq2_alerts.smoke_gas_ticks_to_alert){
 
-					mqtt_app_send_alert("MQ2", msg_id, "WARNING in Sensor MQ2! exceed on lower threshold (value: smoke_gas_percentage)");
+					if(smoke_gas_last_alert_counter[i] == MQ2_STABILIZED_TICKS)
+						msg_id++;
 
-					smoke_gas_is_alerted[i] = true;
-					msg_id++;
+					mqtt_app_send_alert("MQ2", i, msg_id, "WARNING! exceed on lower threshold (value: smoke_gas_percentage)");
+
+					smoke_gas_alert_counter[i] = 0;
+					smoke_gas_last_alert_counter[i] = 0;
 				}
-				else if((smoke_gas_alert_counter[i] == mq2_alerts.smoke_gas_ticks_to_alert) && !smoke_gas_is_alerted[i]){
+				else if(smoke_gas_alert_counter[i] == mq2_alerts.smoke_gas_ticks_to_alert){
 
-					mqtt_app_send_alert("MQ2", msg_id, "WARNING in Sensor MQ2! exceed on upper threshold (value: smoke_gas_percentage)");
+					if(smoke_gas_last_alert_counter[i] == MQ2_STABILIZED_TICKS)
+						msg_id++;
 
-					smoke_gas_is_alerted[i] = true;
-					msg_id++;
+					mqtt_app_send_alert("MQ2", i, msg_id, "WARNING! exceed on upper threshold (value: smoke_gas_percentage)");
+
+					smoke_gas_alert_counter[i] = 0;
+					smoke_gas_last_alert_counter[i] = 0;
 				}
 			}
 		}
@@ -242,7 +247,7 @@ void mq2_init(void){
 			}
 
 			smoke_gas_alert_counter = (int*) malloc(sizeof(int) * mq2_cont);
-			smoke_gas_is_alerted = (bool*) malloc(sizeof(bool) * mq2_cont);
+			smoke_gas_last_alert_counter = (int*) malloc(sizeof(int) * mq2_cont);
 
 			// Initialize adc1 width
 			adc1_config_width(mq2_width);
@@ -335,7 +340,7 @@ int mq2_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason){
 	memset(mq2_locations_array[mq2_cont - 1],0,CHAR_LENGTH + 1);
 
 	smoke_gas_alert_counter = (int*) realloc(smoke_gas_alert_counter, sizeof(int) * mq2_cont);
-	smoke_gas_is_alerted = (bool*) realloc(smoke_gas_is_alerted, sizeof(bool) * mq2_cont);
+	smoke_gas_last_alert_counter = (int*) realloc(smoke_gas_last_alert_counter, sizeof(int) * mq2_cont);
 
 	mq2_gpios_array[mq2_cont - 1].a0 = gpios[0];
 
@@ -344,7 +349,7 @@ int mq2_add_sensor(int* gpios, union sensor_value_u* parameters, char* reason){
 	strcpy(mq2_locations_array[mq2_cont - 1], "");
 
 	smoke_gas_alert_counter[mq2_cont - 1] = 0;
-	smoke_gas_is_alerted[mq2_cont - 1] = false;
+	smoke_gas_last_alert_counter[mq2_cont - 1] = 0;
 
 	nvs_app_set_uint8_value(nvs_MQ2_CONT_key,(uint8_t)mq2_cont);
 	nvs_app_set_blob_value(nvs_MQ2_GPIOS_key,mq2_gpios_array,sizeof(mq2_gpios_t)*mq2_cont);
@@ -396,7 +401,7 @@ int mq2_delete_sensor(int pos, char* reason){
 		strcpy(mq2_locations_array[pos], mq2_locations_array[pos + 1]);
 
 		smoke_gas_alert_counter[pos] = smoke_gas_alert_counter[pos + 1];
-		smoke_gas_is_alerted[pos] = smoke_gas_is_alerted[pos + 1];
+		smoke_gas_last_alert_counter[pos] = smoke_gas_last_alert_counter[pos + 1];
 	}
 
 	mq2_cont--;
@@ -408,7 +413,7 @@ int mq2_delete_sensor(int pos, char* reason){
 	mq2_locations_array = (char**) realloc(mq2_locations_array, sizeof(char*) * mq2_cont);
 
 	smoke_gas_alert_counter = (int*) realloc(smoke_gas_alert_counter, sizeof(int) * mq2_cont);
-	smoke_gas_is_alerted = (bool*) realloc(smoke_gas_is_alerted, sizeof(bool) * mq2_cont);
+	smoke_gas_last_alert_counter = (int*) realloc(smoke_gas_last_alert_counter, sizeof(int) * mq2_cont);
 
 	nvs_app_set_uint8_value(nvs_MQ2_CONT_key,(uint8_t)mq2_cont);
 	nvs_app_set_blob_value(nvs_MQ2_GPIOS_key,mq2_gpios_array,sizeof(mq2_gpios_t)*mq2_cont);
