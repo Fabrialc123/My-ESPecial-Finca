@@ -22,6 +22,8 @@
 #include <wifi_app.h>
 #include <status.h>
 #include <mqtt/mqtt_app.h>
+#include <nvs.h>
+#include <nvs_flash.h>
 
 
 static const char TAG[] = "http_server"; // It is used for serial console messages
@@ -721,6 +723,17 @@ static esp_err_t SensorEditLocation_handler(httpd_req_t *req){
 	return ESP_OK;
 }
 
+static esp_err_t RestartESP_handler(httpd_req_t *req){
+	esp_restart();
+	return ESP_OK;
+}
+
+static esp_err_t ClearAndRestartESP_handler(httpd_req_t *req){
+	nvs_flash_erase();
+	esp_restart();
+	return ESP_OK;
+}
+
 /**
  * Sets up default httpd server configuration
  * @return http server instance handle if successful, NULL otherwise
@@ -735,7 +748,7 @@ static httpd_handle_t http_server_configure(void){
 	config.core_id = HTTP_SERVER_TASK_CORE_ID;
 	config.task_priority = HTTP_SERVER_TASK_PRIORITY;
 	config.stack_size = HTTP_SERVER_TASK_STACK_SIZE;
-	config. max_uri_handlers = 25;
+	config. max_uri_handlers = 30;
 	config.recv_wait_timeout = 10;
 	config.send_wait_timeout = 10;
 
@@ -938,6 +951,22 @@ static httpd_handle_t http_server_configure(void){
 			.user_ctx = NULL
 	    };
 	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &SensorEditLocation));
+
+	    httpd_uri_t RestartESP = {
+			.uri = "/RestartESP",
+			.method = HTTP_POST,
+			.handler = RestartESP_handler,
+			.user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &RestartESP));
+
+	    httpd_uri_t ClearAndRestartESP = {
+			.uri = "/ClearAndRestartESP",
+			.method = HTTP_POST,
+			.handler = ClearAndRestartESP_handler,
+			.user_ctx = NULL
+	    };
+	    ESP_ERROR_CHECK(httpd_register_uri_handler(http_server_handle, &ClearAndRestartESP));
 
 		return http_server_handle;
 	}
