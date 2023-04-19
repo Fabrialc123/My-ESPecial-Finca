@@ -183,7 +183,7 @@ static void mq2_task(void *pvParameters){
 					smoke_gas_last_alert_counter[i]++;
 
 				// Check if it is the moment to alert
-				if(smoke_gas_alert_counter[i] == -mq2_alerts.smoke_gas_ticks_to_alert){
+				if(smoke_gas_alert_counter[i] <= -mq2_alerts.smoke_gas_ticks_to_alert){
 
 					if(smoke_gas_last_alert_counter[i] == MQ2_STABILIZED_TICKS)
 						msg_id++;
@@ -193,7 +193,7 @@ static void mq2_task(void *pvParameters){
 					smoke_gas_alert_counter[i] = 0;
 					smoke_gas_last_alert_counter[i] = 0;
 				}
-				else if(smoke_gas_alert_counter[i] == mq2_alerts.smoke_gas_ticks_to_alert){
+				else if(smoke_gas_alert_counter[i] >= mq2_alerts.smoke_gas_ticks_to_alert){
 
 					if(smoke_gas_last_alert_counter[i] == MQ2_STABILIZED_TICKS)
 						msg_id++;
@@ -237,7 +237,9 @@ void mq2_init(void){
 
 			// Initialize pointers
 			mq2_gpios_array = (mq2_gpios_t*) malloc(sizeof(mq2_gpios_t) * mq2_cont);
+			memset(mq2_gpios_array,0,sizeof(mq2_gpios_t) * mq2_cont);
 			mq2_data_array = (mq2_data_t*) malloc(sizeof(mq2_data_t) * mq2_cont);
+			memset(mq2_data_array,0,sizeof(mq2_data_t) * mq2_cont);
 			mq2_locations_array = (char**) malloc(sizeof(char*) * mq2_cont);
 
 				// Initialize locations
@@ -247,7 +249,9 @@ void mq2_init(void){
 			}
 
 			smoke_gas_alert_counter = (int*) malloc(sizeof(int) * mq2_cont);
+			memset(smoke_gas_alert_counter,0,sizeof(int) * mq2_cont);
 			smoke_gas_last_alert_counter = (int*) malloc(sizeof(int) * mq2_cont);
+			memset(smoke_gas_last_alert_counter,0,sizeof(int) * mq2_cont);
 
 			// Initialize adc1 width
 			adc1_config_width(mq2_width);
