@@ -183,7 +183,7 @@ static void so_sen_task(void *pvParameters){
 					soil_moisture_last_alert_counter[i]++;
 
 				// Check if it is the moment to alert
-				if(soil_moisture_alert_counter[i] == -so_sen_alerts.soil_moisture_ticks_to_alert){
+				if(soil_moisture_alert_counter[i] <= -so_sen_alerts.soil_moisture_ticks_to_alert){
 
 					if(soil_moisture_last_alert_counter[i] == SO_SEN_STABILIZED_TICKS)
 						msg_id++;
@@ -193,7 +193,7 @@ static void so_sen_task(void *pvParameters){
 					soil_moisture_alert_counter[i] = 0;
 					soil_moisture_last_alert_counter[i] = 0;
 				}
-				else if(soil_moisture_alert_counter[i] == so_sen_alerts.soil_moisture_ticks_to_alert){
+				else if(soil_moisture_alert_counter[i] >= so_sen_alerts.soil_moisture_ticks_to_alert){
 
 					if(soil_moisture_last_alert_counter[i] == SO_SEN_STABILIZED_TICKS)
 						msg_id++;
@@ -237,7 +237,9 @@ void so_sen_init(void){
 
 			// Initialize pointers
 			so_sen_gpios_array = (so_sen_gpios_t*) malloc(sizeof(so_sen_gpios_t) * so_sen_cont);
+			memset(so_sen_gpios_array,0,sizeof(so_sen_gpios_t) * so_sen_cont);
 			so_sen_data_array = (so_sen_data_t*) malloc(sizeof(so_sen_data_t) * so_sen_cont);
+			memset(so_sen_data_array,0,sizeof(so_sen_data_t) * so_sen_cont);
 			so_sen_locations_array = (char**) malloc(sizeof(char*) * so_sen_cont);
 
 				// Initialize locations
@@ -247,7 +249,9 @@ void so_sen_init(void){
 			}
 
 			soil_moisture_alert_counter = (int*) malloc(sizeof(int) * so_sen_cont);
+			memset(soil_moisture_alert_counter,0,sizeof(int) * so_sen_cont);
 			soil_moisture_last_alert_counter = (int*) malloc(sizeof(int) * so_sen_cont);
+			memset(soil_moisture_last_alert_counter,0,sizeof(int) * so_sen_cont);
 
 			// Initialize adc1 width
 			adc1_config_width(so_sen_width);
