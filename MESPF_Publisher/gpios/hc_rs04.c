@@ -47,7 +47,7 @@ static hc_rs04_alerts_t hc_rs04_alerts;
 
 	/* Water level */
 static int* water_level_alert_counter;
-static bool* water_level_is_alerted;
+static int* water_level_last_alert_counter;
 
 // NVS keys
 
@@ -187,9 +187,9 @@ static void hc_rs04_task(void *pvParameters){
 			if(hc_rs04_alerts.water_level_alert){
 
 				// Update counter
-				if((hc_rs04_data_array[i].water_level_percentage < hc_rs04_alerts.water_level_lower_threshold) && (water_level_alert_counter[i] > -hc_rs04_alerts.water_level_ticks_to_alert))
+				if(hc_rs04_data_array[i].water_level_percentage < hc_rs04_alerts.water_level_lower_threshold)
 					water_level_alert_counter[i]--;
-				else if((hc_rs04_data_array[i].water_level_percentage > hc_rs04_alerts.water_level_upper_threshold) && (water_level_alert_counter[i] < hc_rs04_alerts.water_level_ticks_to_alert))
+				else if(hc_rs04_data_array[i].water_level_percentage > hc_rs04_alerts.water_level_upper_threshold)
 					water_level_alert_counter[i]++;
 				else{
 					if(water_level_alert_counter[i] > 0)
@@ -198,25 +198,30 @@ static void hc_rs04_task(void *pvParameters){
 						water_level_alert_counter[i]++;
 				}
 
-				// Check if the value can be alerted again
-				if((water_level_alert_counter[i] == 0) && water_level_is_alerted[i]){
-					water_level_is_alerted[i] = false;
-				}
+				// Update last alert counter
+				if(water_level_last_alert_counter[i] < HC_RS04_STABILIZED_TICKS)
+					water_level_last_alert_counter[i]++;
 
 				// Check if it is the moment to alert
-				if((water_level_alert_counter[i] == -hc_rs04_alerts.water_level_ticks_to_alert) && !water_level_is_alerted[i]){
+				if(water_level_alert_counter[i] == -hc_rs04_alerts.water_level_ticks_to_alert){
 
-					mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on lower threshold (value: water_level_percentage)");
+					if(water_level_last_alert_counter[i] == HC_RS04_STABILIZED_TICKS)
+						msg_id++;
 
-					water_level_is_alerted[i] = true;
-					msg_id++;
+					mqtt_app_send_alert("HC_RS04", i, msg_id, "WARNING! exceed on lower threshold (value: water_level_percentage)");
+
+					water_level_alert_counter[i] = 0;
+					water_level_last_alert_counter[i] = 0;
 				}
-				else if((water_level_alert_counter[i] == hc_rs04_alerts.water_level_ticks_to_alert) && !water_level_is_alerted[i]){
+				else if(water_level_alert_counter[i] == hc_rs04_alerts.water_level_ticks_to_alert){
 
-					mqtt_app_send_alert("HC_RS04", msg_id, "WARNING in Sensor HC_RS04! exceed on upper threshold (value: water_level_percentage)");
+					if(water_level_last_alert_counter[i] == HC_RS04_STABILIZED_TICKS)
+						msg_id++;
 
-					water_level_is_alerted[i] = true;
-					msg_id++;
+					mqtt_app_send_alert("HC_RS04", i, msg_id, "WARNING! exceed on upper threshold (value: water_level_percentage)");
+
+					water_level_alert_counter[i] = 0;
+					water_level_last_alert_counter[i] = 0;
 				}
 			}
 		}
@@ -263,7 +268,7 @@ void hc_rs04_init(void){
 			}
 
 			water_level_alert_counter = (int*) malloc(sizeof(int) * hc_rs04_cont);
-			water_level_is_alerted = (bool*) malloc(sizeof(bool) * hc_rs04_cont);
+			water_level_last_alert_counter = (int*) malloc(sizeof(int) * hc_rs04_cont);
 
 			// Initialize alerts
 			hc_rs04_alerts.water_level_alert = false;
@@ -372,7 +377,7 @@ int hc_rs04_add_sensor(int* gpios, union sensor_value_u* parameters, char* reaso
 	memset(hc_rs04_locations_array[hc_rs04_cont - 1],0,CHAR_LENGTH + 1);
 
 	water_level_alert_counter = (int*) realloc(water_level_alert_counter, sizeof(int) * hc_rs04_cont);
-	water_level_is_alerted = (bool*) realloc(water_level_is_alerted, sizeof(bool) * hc_rs04_cont);
+	water_level_last_alert_counter = (int*) realloc(water_level_last_alert_counter, sizeof(int) * hc_rs04_cont);
 
 	hc_rs04_additional_params_array[hc_rs04_cont - 1].distance_between_sensor_and_tank = parameters[0].ival;
 	hc_rs04_additional_params_array[hc_rs04_cont - 1].tank_depth = parameters[1].ival;
@@ -385,7 +390,7 @@ int hc_rs04_add_sensor(int* gpios, union sensor_value_u* parameters, char* reaso
 	strcpy(hc_rs04_locations_array[hc_rs04_cont - 1], "");
 
 	water_level_alert_counter[hc_rs04_cont - 1] = 0;
-	water_level_is_alerted[hc_rs04_cont - 1] = false;
+	water_level_last_alert_counter[hc_rs04_cont - 1] = 0;
 
 	nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
 	nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
@@ -442,7 +447,7 @@ int hc_rs04_delete_sensor(int pos, char* reason){
 		strcpy(hc_rs04_locations_array[pos], hc_rs04_locations_array[pos + 1]);
 
 		water_level_alert_counter[pos] = water_level_alert_counter[pos + 1];
-		water_level_is_alerted[pos] = water_level_is_alerted[pos + 1];
+		water_level_last_alert_counter[pos] = water_level_last_alert_counter[pos + 1];
 	}
 
 	hc_rs04_cont--;
@@ -455,7 +460,7 @@ int hc_rs04_delete_sensor(int pos, char* reason){
 	hc_rs04_locations_array = (char**) realloc(hc_rs04_locations_array, sizeof(char*) * hc_rs04_cont);
 
 	water_level_alert_counter = (int*) realloc(water_level_alert_counter, sizeof(int) * hc_rs04_cont);
-	water_level_is_alerted = (bool*) realloc(water_level_is_alerted, sizeof(bool) * hc_rs04_cont);
+	water_level_last_alert_counter = (int*) realloc(water_level_last_alert_counter, sizeof(int) * hc_rs04_cont);
 
 	nvs_app_set_uint8_value(nvs_HC_RS04_CONT_key,(uint8_t)hc_rs04_cont);
 	nvs_app_set_blob_value(nvs_HC_RS04_GPIOS_key,hc_rs04_gpios_array,sizeof(hc_rs04_gpios_t)*hc_rs04_cont);
