@@ -20,6 +20,7 @@
 #define MQ2_N_ADDITIONAL_PARAMS					0
 
 #define MQ2_TIME_TO_UPDATE_DATA					500	// 100 = 1 second
+#define MQ2_STABILIZED_TICKS					18000 / MQ2_TIME_TO_UPDATE_DATA
 
 // LCD related defines (1 for each value)
 
