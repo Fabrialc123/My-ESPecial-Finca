@@ -47,10 +47,13 @@ static short int WIFI_CONNECTED = -1;
 static unsigned int s_retry_num = 0;
 static wifi_mode_t WIFI_MODE = WIFI_MODE_STA;
 
+static char wifi_ip[20];
+
 
 
 static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
 	char dis_log[LOG_MSG_LEN];
+	ip_event_got_ip_t *got_ip_data;
 	wifi_event_sta_disconnected_t *data;
 	if (event_base == WIFI_EVENT){
 		switch(event_id){
@@ -115,9 +118,12 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 		switch(event_id){
 			case IP_EVENT_STA_GOT_IP:
 				ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
+				got_ip_data = (ip_event_got_ip_t*) event_data;
 				pthread_mutex_lock(&mutex_WIFI);
 					WIFI_CONNECTED = 1;
 					led_rgb_wifi_connected();	// GREEN
+					memset(wifi_ip,0,20);
+					sprintf(wifi_ip, IPSTR, IP2STR(&got_ip_data->ip_info.ip));
 				pthread_mutex_unlock(&mutex_WIFI);
 				break;
 		}
@@ -310,6 +316,7 @@ BaseType_t wifi_app_send_message(wifi_app_msg_e msgID){
 	return xQueueSend(wifi_app_queue_handle, &msg, portMAX_DELAY);
 }
 
+/*
 static short int is_wifi_connected(){
 	short int result ;
 
@@ -319,6 +326,7 @@ pthread_mutex_unlock(&mutex_WIFI);
 
 return result;
 }
+*/
 
 void wifi_app_start(void){
 	ESP_LOGI(TAG, "STARTING WIFI APPLICATION");
@@ -344,14 +352,15 @@ void wifi_app_start(void){
 
 void wifi_app_getIP(char *ip){
 
-	tcpip_adapter_ip_info_t ipInfo;
+	pthread_mutex_lock(&mutex_WIFI);
+	if (WIFI_CONNECTED == 1){
+		strcpy(ip,wifi_ip);
 
-	if (is_wifi_connected()){
-		tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ipInfo);
-		sprintf(ip, IPSTR, IP2STR(&ipInfo.ip));
 	}else {
 		sprintf(ip, "N/A");
 	}
+
+	pthread_mutex_unlock(&mutex_WIFI);
 }
 
 void wifi_app_get_conf(char *ssid, char *pass , short int *status){
