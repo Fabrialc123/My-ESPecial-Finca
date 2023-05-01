@@ -42,7 +42,7 @@ OPERACIÓN 0: Cambio de los valores de la alarma.
 
   ARG3: Umbral superior de la alarma (UPPER_THRESHOLD), dependerá del tipo de valor que use el sensor
 
-  ARG4: Umbral superior de la alarma (LOWER_THRESHOLD)
+  ARG4: Umbral inferior de la alarma (LOWER_THRESHOLD)
 
 Ejemplo 1 de llamada: Para el MQ2, activar la alarma del único valor que tiene (que es un FLOAT) para que suene la alarma en caso de que se sobrepase el 60%
 Tópico: MESPF/SENS/ESP32_X/MQ2/1/CMD/SET
