@@ -4,7 +4,7 @@ import android.content.ContentValues
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Handler
+import android.util.Log
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.tfg_boceto.adapter.TopicAdapter
@@ -12,11 +12,15 @@ import com.example.tfg_boceto.databinding.ActivityScanBinding
 import com.example.tfg_boceto.models.Mqtt
 import com.example.tfg_boceto.models.MqttResultado
 import com.example.tfg_boceto.models.persistencia.TopicDatabaseHelper
+import org.json.JSONException
 
 import org.json.JSONObject
 import org.json.JSONTokener
 
 
+private const val SCAN_CONST = "MESPF/SENS/SCAN"
+//AL scan resp hay que añadirle el username/SCAN
+private const val SCAN_RESP = "MESPF/USR/"
 private const val MQTT_RECIBE = "MESPF/SENS/+/+/+/INFO"
 //private const val MQTT_RECIBE = "TESTRARES"
 private lateinit var binding: ActivityScanBinding
@@ -28,7 +32,7 @@ private lateinit var usernameLogin: String
 private lateinit var passwordLogin: String
 private const val DB_NAME = "TOPIC_TABLE"
 private const val COL_NAME = "Nombre"
-
+private var SCAN_RESPUESTA = SCAN_RESP+ userName+"/SCAN"
 
 class ScanActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,19 +47,13 @@ class ScanActivity : AppCompatActivity() {
         initRecyclerView()
         mqttDatos = Mqtt(MQTT_SERVER)
         //TODO CAMBIAR USUARIO Y CONTRASEÑA DE MANERA DINAMICA
-        usernameLogin = "MESPF_USER"
-        passwordLogin = "MESPF_USER"
+        //usernameLogin = "MESPF_USER"
+        //passwordLogin = "MESPF_USER"
 
         //Get las variables del intent anterior
         val intent = Intent(this, ScanActivity::class.java)
-        //usernameLogin = intent.getStringExtra("username").toString()
-        //passwordLogin = intent.getStringExtra("password").toString()
 
-
-        mqttDatos?.connect(usernameLogin, passwordLogin,::suscribesTopic, ::onMqttError)
-
-        //TODO DE PRUEBA POR AHORA FIJO
-        //mqttDatos?.publishTopic(MQTT_SCAN, USER_MQTT);
+        mqttDatos?.connect(userLogin, userPassword,::suscribesTopic, ::onMqttError)
 
         Toast.makeText(this, "Espere un momento mientras se buscan dispositivos", Toast.LENGTH_LONG).show()
 
@@ -64,21 +62,72 @@ class ScanActivity : AppCompatActivity() {
         }
     }
 
+    //SUB TOPICO DEL SCAN
+    private fun subTopico(toopico: String) = runOnUiThread{
+        mqttDatos?.suscribeTopic(toopico)?.observe(this) { result ->
+            when (result) {
+                is MqttResultado.Failure -> onMqttError(result)
+                is MqttResultado.Success -> onMqttMsgScan(result)
+                else -> {}
+            }
 
+        }
+    }
+
+    private fun parseTopicNotList(msg: String): String{
+        if(msg.contains("DT")){
+            try{
+                val jsonObject = JSONObject(msg)
+                val dt = jsonObject.getString("DT")
+                return dt
+            }catch(e: JSONException){
+                Log.d("JSON", "Mensaje no tiene formato correcto $msg")
+            }
+        }
+
+
+
+
+        return ""
+
+    }
+
+    private fun onMqttMsgScan(result: MqttResultado.Success){
+        result?.payload.run {
+            if(this == null)
+                return
+            val nameString = String(this!!)
+                if(!nameString.contains("DT"))
+                    return
+                val topicoN = parseTopicNotList(nameString)
+
+
+                if(!topicMutableList.contains(topicoN)){
+                    topicMutableList.add(topicoN)
+                    adapter.notifyItemInserted(adapter.itemCount - 1)
+                }
+        }
+    }
+
+    private fun publishTopic(topic: String, payload: String){
+        mqttDatos?.publishTopic(topic, payload)
+    }
     private fun onMqttError(failure: MqttResultado.Failure) {
         Toast.makeText(this, "Error connecting to mqtt ", Toast.LENGTH_SHORT).show()
 
     }
 
     private fun suscribesTopic() = runOnUiThread {
-        mqttDatos?.suscribeTopic(MQTT_RECIBE)?.observe(this) { result ->
+        mqttDatos?.suscribeTopic(SCAN_RESPUESTA)?.observe(this) { result ->
             when (result) {
                 is MqttResultado.Failure -> onMqttError(result)
-                is MqttResultado.Success -> onMqttMessageReceived(result)
+                is MqttResultado.Success -> onMqttMsgScan(result)
                 else -> {}
             }
 
         }
+
+        publishTopic(SCAN_CONST, userName)
     }
 
 
@@ -94,10 +143,11 @@ class ScanActivity : AppCompatActivity() {
         result?.payload.run {
 
             val nameString = String(this!!)
-
+            var topicCurr: String = ""
+            topicCurr = mqttData?.getTopic().toString()
             //TODO comprobar si el formato de parseo es correcto
             Toast.makeText(this@ScanActivity, nameString, Toast.LENGTH_SHORT).show()
-            if (nameString.contains("ESP")) {
+            if (topicCurr.contains("/USR/$userName/SCAN")) {
 
                 val topicoN = parseTopicNameJSON(nameString)
 
@@ -111,6 +161,7 @@ class ScanActivity : AppCompatActivity() {
             Toast.makeText(this@ScanActivity, nameString, Toast.LENGTH_LONG).show()
         }
     }
+
 
     private fun parseTopicNameJSON(cadena: String): String {
         val jsonObject = JSONTokener(cadena).nextValue() as JSONObject
@@ -183,15 +234,19 @@ class ScanActivity : AppCompatActivity() {
         adapter.notifyItemRemoved(pos)
         Toast.makeText(this@ScanActivity, "Se ha suscrito al dispositivo "+ elementoElegio, Toast.LENGTH_SHORT).show()
 
-        //Desuscribir del topico una vez se ha conseguido el nombre que se deseaba
-        if(mqttDatos?.connected() == true)
-            mqttDatos?.unsubscribe(MQTT_RECIBE)
     }
 
     override fun onBackPressed() {
         super.onBackPressed()
-        if(mqttDatos?.connected() == true)
+        if(mqttDatos?.connected() == true){
             mqttDatos?.unsubscribe(MQTT_RECIBE)
+            mqttDatos?.disconnect()
+        }
+
+
+        val intent = Intent(this@ScanActivity, MainActivity::class.java)
+        intent.putExtra("vuelta", true)
+        startActivity(intent)
     }
 
 

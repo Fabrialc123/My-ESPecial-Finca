@@ -8,7 +8,7 @@ import com.example.tfg_boceto.databinding.ItemTopicScanBinding
 
 class TopicViewHolder(view: View) : RecyclerView.ViewHolder(view) {
 
-    private val binding = ItemTopicScanBinding.bind(view)
+    val binding = ItemTopicScanBinding.bind(view)
     var isSelected: Boolean = false
         set(value) {
             field = value
@@ -18,10 +18,10 @@ class TopicViewHolder(view: View) : RecyclerView.ViewHolder(view) {
     fun render(topic: String, onClickListener: (String) -> Unit) {
 
         binding.tvDispositivoScanId.text = topic
-        itemView.setOnClickListener {
+        //itemView.setOnClickListener {
             //binding.bvDispositivoAdd.visibility = View.VISIBLE //hacemos visible el boton de añadir
-            onClickListener(topic)
-        }
+            //onClickListener(topic)
+        //}
 
 
     }

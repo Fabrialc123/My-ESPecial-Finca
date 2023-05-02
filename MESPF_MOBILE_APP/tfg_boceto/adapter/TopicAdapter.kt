@@ -23,21 +23,27 @@ class TopicAdapter(
     override fun onBindViewHolder(holder: TopicViewHolder, position: Int) {
         val item = topicList[position]
 
+        holder.render(item, onClickListener)
+
+        if(position == lastSelectedPosition){
+            holder.binding.root.setBackgroundColor(Color.parseColor("#CCCCCC"))
+        }
+        else{
+            holder.binding.root.setBackgroundColor(Color.parseColor("#FFFFFF"))
+        }
 
 
         holder.isSelected = (position == lastSelectedPosition)
         holder.itemView.setOnClickListener {
+            val antigSelect = lastSelectedPosition
             lastSelectedPosition = position
-            notifyDataSetChanged()
+
+            notifyItemChanged(antigSelect)
+
+            notifyItemChanged(lastSelectedPosition)
+
+            onClickListener(item.toString())
         }
-
-        //var rowLinearlayout = holder.itemView.findViewById<LinearLayout>(R.id.scanRecyclerList)
-        //rowLinearlayout.setBackgroundColor(Color.parseColor("#FFFFFF")) // todos los colores a blanco
-        //holder.itemView.setBackgroundColor(Color.parseColor("#858B8E")) // el item seleccionado en gris
-
-        holder.render(item, onClickListener)
-
-        //holder.button(item)
     }
 
     override fun getItemCount(): Int {

@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import io.reactivex.internal.util.ExceptionHelper
 import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import java.util.*
@@ -50,6 +51,38 @@ class Mqtt(uri: String) {
 
         _mqttStatusLiveData.postValue(MqttResultado.Waiting)
     }
+
+    fun connectLogin(username: String, pass: String, onError: MqttResultado.Failure.() -> Unit){
+        val mqttConnectionOptions = MqttConnectOptions()
+        mqttConnectionOptions.isAutomaticReconnect = true
+        mqttConnectionOptions.isCleanSession = false
+        //TODO descomentar
+        mqttConnectionOptions.userName = username
+        mqttConnectionOptions.password = pass.toCharArray()
+
+        try {
+            mqttClient.connect(mqttConnectionOptions, null, object : IMqttActionListener {
+                override fun onSuccess(asyncActionToken: IMqttToken?) {
+                    val disconnectedBufferOptions = DisconnectedBufferOptions()
+                    disconnectedBufferOptions.isBufferEnabled = true
+                    disconnectedBufferOptions.bufferSize = 100
+                    disconnectedBufferOptions.isPersistBuffer = false
+                    disconnectedBufferOptions.isDeleteOldestMessages = false
+
+                    mqttClient.setBufferOpts(disconnectedBufferOptions)
+                    _mqttStatusLiveData.postValue(MqttResultado.Success("Connected".toByteArray()))
+                }
+
+                override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
+                    MqttResultado.Failure(exception).onError()
+                }
+
+            })
+        } catch (e: MqttException) {
+            _mqttStatusLiveData.postValue(MqttResultado.Failure(e))
+        }
+    }
+
 
     fun connect(username:String, pass: String, onConnected: () -> Unit,  onError: MqttResultado.Failure.() -> Unit = {}) {
         val mqttConnectionOptions = MqttConnectOptions()
@@ -108,7 +141,15 @@ class Mqtt(uri: String) {
     
     fun publishTopic(topic: String, payload: String){
         _mqttStatusLiveData.postValue(MqttResultado.Waiting)
-        mqttClient.publish(topic, MqttMessage(payload.toByteArray(Charsets.UTF_8)))
+        try{
+            mqttClient.publish(topic, MqttMessage(payload.toByteArray(Charsets.UTF_8)))
+        }
+        catch(e: MqttException){
+            e.printStackTrace()
+        }
+        Log.d("MQTT", "MqttClient ${mqttClient.toString()}")
+        Log.d("MQTT", "Published in topic $topic message $payload")
+
     }
 
     fun unsubscribe(topic: String) {

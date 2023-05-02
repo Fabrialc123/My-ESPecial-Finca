@@ -1,30 +1,30 @@
 package com.example.tfg_boceto.adapter
 
 import android.graphics.Color
+import android.util.Log
 import android.view.View
+import androidx.core.content.ContextCompat
 
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.tfg_boceto.Esp32
+import com.example.tfg_boceto.R
 import com.example.tfg_boceto.databinding.ItemEsp32Binding
 
 class EspViewHolder(view: View) : RecyclerView.ViewHolder(view) {
 
     val binding = ItemEsp32Binding.bind(view)
     private var esp32Model: Esp32? = null
-    var isSelected: Boolean = false
-    set(value) {
-        field = value
-        itemView.setBackgroundColor(if(value) Color.parseColor("#CCCCCC") else Color.parseColor("#FFFFFF"))
-    }
+
     //return position
-    fun render(esp32Model: Esp32, onClickListener: (Esp32) -> Unit, onclickEdit: (Int) -> Unit) {
+    fun render(esp32Model: Esp32,  onClickListener: (Int) -> Unit, onclickEdit: (Int) -> Unit) {
         this.esp32Model = esp32Model
+
         //SI alias es distinto se elige Alias
-        if(esp32Model.nombre_esp != esp32Model.alias_esp)
+        //if(esp32Model.nombre_esp != esp32Model.alias_esp)
             binding.tvEspNombre.text = esp32Model.alias_esp
-        else
-            binding.tvEspNombre.text = esp32Model.nombre_esp
+        //else
+           // binding.tvEspNombre.text = esp32Model.nombre_esp
 
         //############TEMPERATURA ºC
         if(esp32Model.temperatura == -1000.0)
@@ -79,13 +79,24 @@ class EspViewHolder(view: View) : RecyclerView.ViewHolder(view) {
                 "Concentracion gas: " + esp32Model.humedad_tierra.toString() + " %"
         }
 
-            binding.botonEditHolder.setOnClickListener { onclickEdit(adapterPosition) }
+        //Si no hay valores para ningun sensor, no estamos recibiendo informacion
+        if(esp32Model.temperatura == -1000.0 && esp32Model.humedad == -1000.0 && esp32Model.concentracion_gas == -1000.0
+            && esp32Model.humedad_tierra == -1000.0 && esp32Model.nivel_agua == -1000.0)
+            binding.ivEstadoConexion.setImageResource(R.drawable.conexion_inexistente_imagen)
+        else
+            binding.ivEstadoConexion.setImageResource(R.drawable.conexion_buena_imagen)
 
-        // Accion que ocurre al seleccionar toda la celda del esp32 seleccionado
+
+
+        binding.botonRefrescarHolder.setOnClickListener {
+                onclickEdit(adapterPosition)}
+
+        //No se hace aqui porque usamos el listener del adapter
+        /*
         itemView.setOnClickListener {
-            onClickListener(esp32Model)
+            onClickListener(adapterPosition)
         }
-
+        */
         // If we want to load the image from the internet
         //Glide.with(estado.context).load(esp32.iv_estado_conexion).into(estado)
 
