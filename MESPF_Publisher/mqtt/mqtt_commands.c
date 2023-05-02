@@ -80,9 +80,9 @@ void mqtt_app_send_info(char* topic){
 
 	recollecters = get_recollecters_size();
 	for (i = 0; i < recollecters;i++){
-		memset(&sensor_topic, 0, MQTT_APP_MAX_TOPIC_LENGTH);
 		free(get_sensor_data(i,&sensors));
 		for(j = 0; j < sensors;j++){
+			memset(&sensor_topic, 0, MQTT_APP_MAX_TOPIC_LENGTH);
 			memset(&data, 0, MQTT_APP_MAX_DATA_LENGTH);
 			memset(&sensorName, 0, CHAR_LENGTH);
 			memset(&num_sensor,0,CHAR_LENGTH);
