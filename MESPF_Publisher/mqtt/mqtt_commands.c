@@ -19,6 +19,7 @@
 
 static const char TAG2[] = "MQTT_COMMANDS";
 
+void mqtt_app_refresh_command (char *data);
 void mqtt_app_scan_command(char* src);
 void mqtt_app_set_command (char *sensor_name,int sensor_unit,char *data);
 void mqtt_app_getconf_command (char *sensor_name,int sensor_unit,char *data);
@@ -39,7 +40,7 @@ void mqtt_app_process_command(char* topic,char* data){
 
 	}else if(tl >= (aux=strlen(REFRESH_TOPIC)) && strncmp(&topic[tl - aux],REFRESH_TOPIC,aux) == 0){
 		ESP_LOGI(TAG2,"Received a REFRESH request from topic %s to topic %s",topic,data);
-		mqtt_app_send_info(data);
+		mqtt_app_refresh_command(data);
 
 	}else if(tl >= (aux=strlen(SET_TOPIC)) && strncmp(&topic[tl - aux],SET_TOPIC,aux) == 0){
 		ESP_LOGI(TAG2,"Received a SET request (%s)",data);
@@ -65,6 +66,47 @@ void mqtt_app_process_command(char* topic,char* data){
 	else{
 		ESP_LOGE(TAG2, "mqtt_app_process_command: NOT SUPPORTED COMMAND %s",topic);
 	}
+
+}
+
+void mqtt_app_refresh_command (char *data){
+	struct cJSON *jobj, *aux;
+	int id, resp;
+	char src[SET_COMMAND_SRC];
+
+	jobj = cJSON_Parse(data);
+
+	resp = -1;
+
+	if (!cJSON_HasObjectItem(jobj,"USER")){
+		ESP_LOGE(TAG2, "mqtt_app_process_set_command, USER not defined!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	aux = cJSON_GetObjectItem(jobj,"USER");
+	if(!cJSON_IsString(aux) || (strlen(cJSON_GetStringValue(aux)) >= SET_COMMAND_SRC)){
+		ESP_LOGE(TAG2, "mqtt_app_process_set_command, USER is not STRING or too long!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	strcpy(src, cJSON_GetStringValue(aux));
+
+
+	if (!cJSON_HasObjectItem(jobj,"ID")){
+		ESP_LOGE(TAG2, "mqtt_app_process_set_command, ID not defined!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	aux = cJSON_GetObjectItem(jobj,"ID");
+	if(!cJSON_IsNumber(aux)){
+		ESP_LOGE(TAG2, "mqtt_app_process_set_command, ID is not NUMBER!");
+		cJSON_Delete(jobj);
+		return;
+	}
+	id = (int)cJSON_GetNumberValue(aux);
+
+	mqtt_app_send_info(src);
+	mqtt_app_send_resp(src,id,resp);
 
 }
 
