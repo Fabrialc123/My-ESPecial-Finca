@@ -53,8 +53,8 @@ Mensaje:
 "OPT": 0,
 "ARG1": "0",
 "ARG2": "1",
-"ARG3": "10",
-"ARG4": "60.0"
+"ARG3": "60.0",
+"ARG4": "10.0"
 }
 
 Ejemplo 2 de llamada: Para el DHT22, activar la alarma del segundo valor (Temperatura, FLOAT) para que suene la alarm en caso de que sea muy baja o muy alta:
@@ -66,8 +66,8 @@ Mensaje:
 "OPT": 0,
 "ARG1": "1",
 "ARG2": "1",
-"ARG3": "10",
-"ARG4": "50.2"
+"ARG3": "50.2",
+"ARG4": "10.0"
 }
 
 NOTA: Actualmente los umbrales de alarma son comunes a todos los sensores del mismo tipo, por lo que no importa si se publica el mensaje en:
