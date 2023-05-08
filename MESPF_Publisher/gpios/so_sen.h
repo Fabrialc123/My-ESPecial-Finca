@@ -29,7 +29,7 @@
 // Additional Defines
 
 #define SO_SEN_LOW_V							4095
-#define SO_SEN_HIGH_V							1700
+#define SO_SEN_HIGH_V							1000
 
 static const adc_bits_width_t so_sen_width 		= ADC_WIDTH_BIT_12;
 static const adc_atten_t so_sen_atten	 		= ADC_ATTEN_DB_11;
