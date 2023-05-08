@@ -290,7 +290,7 @@ static void mqtt_app_task(void *pvParameters){
 				case MQTT_APP_MSG_PUBLISH_DATA:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_PUBLISH_DATA to topic %s",msg.src);
 					mqtt_app_format_data(msg.data);
-					if (is_mqtt_connected()){
+					if (is_mqtt_connected() == 1){
 						esp_mqtt_client_publish(client, msg.src, msg.data, 0, MQTT_APP_QOS, 0);
 						ESP_LOGI(TAG, "sent publish successful");
 					}else ESP_LOGI(TAG, "can't sent data! MQTT is disconnected");
@@ -300,7 +300,7 @@ static void mqtt_app_task(void *pvParameters){
 				case MQTT_APP_MSG_SUBSCRIBE:
 					ESP_LOGI(TAG, "MQTT_APP_MSG_SUBSCRIBE to topic %s", msg.data);
 
-					if (is_mqtt_connected()){
+					if (is_mqtt_connected() == 1){
 						esp_mqtt_client_subscribe(client, msg.data, MQTT_APP_QOS);
 						ESP_LOGI(TAG, "sent subscribe to topic %s ",msg.data);
 					} else ESP_LOGI(TAG, "can't subscribe! MQTT is disconnected");
