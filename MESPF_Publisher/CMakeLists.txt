@@ -10,6 +10,7 @@ idf_component_register(SRCS main.c wifi_app.c http_server.c
 							gpios/dht22.c
 							gpios/hc_rs04.c
 							gpios/so_sen.c
+							gpios/ra_sen.c
 							gpios/rtc.c
 							log.c
 							nvs_app.c
