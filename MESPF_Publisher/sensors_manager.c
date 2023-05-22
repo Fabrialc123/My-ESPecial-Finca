@@ -17,6 +17,7 @@
 #include "gpios/dht22.h"
 #include "gpios/hc_rs04.h"
 #include "gpios/so_sen.h"
+#include "gpios/ra_sen.h"
 
 static const char TAG[] 							= "sensors_manager";
 
@@ -112,6 +113,7 @@ void sensors_manager_sensors_initialization(void){
 	dht22_init();
 	hc_rs04_init();
 	so_sen_init();
+	ra_sen_init();
 }
 
 int sensors_manager_add_sensor_unit(int id, int* gpios, union sensor_value_u* parameters, char* reason){
