@@ -10,7 +10,7 @@
 
 #include "esp_netif.h"
 
-#define RECOLLECTER_SIZE 5
+#define RECOLLECTER_SIZE 10
 #define CHAR_LENGTH 20
 #define MAX_STRING_LENGTH 255
 
