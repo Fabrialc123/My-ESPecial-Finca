@@ -44,6 +44,10 @@
 #define SO_SEN_PRIORITY					4
 #define SO_SEN_CORE_ID					1
 
+#define RA_SEN_STACK_SIZE				4096
+#define RA_SEN_PRIORITY					4
+#define RA_SEN_CORE_ID					1
+
 #define MQ2_STACK_SIZE					4096
 #define MQ2_PRIORITY					5
 #define MQ2_CORE_ID						1
