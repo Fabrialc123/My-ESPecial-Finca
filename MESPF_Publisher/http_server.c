@@ -5,7 +5,11 @@
  *      Author: fabri
  */
 
-
+/*
+* Las funciones del OTA se han aprendido del curso de udemy https://www.udemy.com/course/iot-application-development-with-the-esp32-using-the-esp-idf/
+* Curso subido por el usuario https://www.udemy.com/user/kevin-aguilar-19/
+*
+*/
 #include "http_server.h"
 #include "task_common.h"
 #include "wifi_app.h"
