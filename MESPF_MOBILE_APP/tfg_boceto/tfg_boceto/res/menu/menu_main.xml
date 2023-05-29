@@ -1,0 +1,24 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.example.tfg_boceto.MainActivity">
+
+    <item android:id="@+id/nav_editar"
+        android:icon="@drawable/ic_edit_menu"
+        app:showAsAction="ifRoom"
+        android:title="Editar Seleccionado"></item>
+    <item android:id="@+id/nav_eliminar"
+        android:icon="@drawable/delete_esp_draw"
+        android:title="Borrar Seleccionado"
+        app:showAsAction="ifRoom"/>
+    <item android:id="@+id/nav_add"
+        android:title="Nuevo Item"
+        android:icon="@drawable/ic_add_circle_menu"
+        app:showAsAction="ifRoom"/>
+    <item android:id="@+id/infoButton"
+        android:title="Info"
+        android:icon="@drawable/info_button"
+        app:showAsAction="ifRoom"></item>
+
+
+</menu>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+
+
+        <ImageView
+            android:layout_width="30dp"
+            android:id="@+id/desconectadoDialog"
+            android:layout_height="30dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginLeft="10dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            android:src="@drawable/conexion_inexistente_imagen"></ImageView>
+
+        <ImageView
+            android:layout_width="30dp"
+            android:id="@+id/conectadoDialog"
+            android:layout_height="30dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginLeft="10dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toEndOf="@id/desconectadoDialog"
+            android:src="@drawable/conexion_buena_imagen"></ImageView>
+
+        <TextView
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/textoInfoStatus"
+            app:layout_constraintStart_toStartOf="parent"
+
+            app:layout_constraintTop_toBottomOf="@id/conectadoDialog"
+            android:textSize="12dp"
+            android:text="El circulo gris indica que no estamos conectados y el verde que lo estamos. Clicando este botón vemos el status del dispositivo"
+            android:layout_marginTop="10dp"
+            android:layout_marginLeft="10dp"></TextView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:textSize="13dp"
+            android:layout_marginLeft="5dp"
+            android:layout_marginTop="5dp"
+            android:text="Cada recuadro que vemos corresponde a un ESP y si su titulo contiene (numero) indica que ese
+ESP tiene varios sensores del mismo tipo y los separamos con un parentesis y el numero de esos sensores repetido.
+Para hacer cualquier accion sobre los ESP seleccionamos el ESP y después podemos efectuar las acciones del menú superior."
+            app:layout_constraintStart_toStartOf="@id/conectadoDialog"
+            app:layout_constraintTop_toBottomOf="@id/textoInfoStatus"></TextView>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

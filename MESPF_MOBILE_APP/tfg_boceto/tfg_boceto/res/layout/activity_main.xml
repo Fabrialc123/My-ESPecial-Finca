@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+
+    <!-- BLOQUE PREVIO AL LOGIN-->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/layout_pre_login_main"
+        android:visibility="visible"
+        android:orientation="vertical"
+        >
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/new_account_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="NUEVOS DATOS MQTT"
+        android:fontFamily="serif"
+        android:textColor="@color/blanco"
+        android:paddingLeft="5dp"
+        android:paddingRight="5dp"
+        android:background="@drawable/verde_boton_src"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+    </com.google.android.material.button.MaterialButton>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/exist_account_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="USAR DATOS GUARDADOS"
+        android:fontFamily="serif"
+        android:textColor="@color/blanco"
+        android:paddingLeft="5dp"
+        android:paddingRight="5dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/verde_boton_src"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/new_account_btn" >
+    </com.google.android.material.button.MaterialButton>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    <!--##################### BLOQUE DE LOGIN ######################-->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/layout_login_main"
+        android:visibility="gone"
+        >
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toTopOf="parent"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp"
+            android:layout_marginTop="10dp"
+            android:id="@+id/contenidoLoginCuadros">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:id="@+id/contenidoipmqtt"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:hintTextColor="@color/gris"
+                app:layout_constraintStart_toStartOf="parent"
+                app:boxBackgroundMode="outline"
+                app:startIconDrawable="@drawable/conexion_symbol"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:layout_constraintTop_toTopOf="parent"
+                android:hint="IP Y PUERTO MQTT">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/ip_mqtt"
+                    android:layout_width="match_parent"
+                    app:hintTextColor="@color/gris"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="96dp"
+                    android:inputType="number"
+                    android:digits="0123456789.:"
+                    />
+            </com.google.android.material.textfield.TextInputLayout>
+
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/contenidoUsername"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:hint="USERNAME MQTT"
+                app:hintTextColor="@color/gris"
+                app:boxBackgroundMode="outline"
+                app:startIconDrawable="@drawable/usuario_icono"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/contenidoipmqtt">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/username_mqtt"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:hintTextColor="@color/gris"
+                    android:inputType="textEmailAddress"
+                  />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/contenidoPass"
+                android:hint="PASSWORD MQTT"
+                app:hintTextColor="@color/gris"
+                app:startIconDrawable="@drawable/password_icon"
+                app:boxBackgroundMode="outline"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/contenidoUsername">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/password_mqtt"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/gris"
+                    android:inputType="textPassword" />
+
+
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/contenidoUserNoMqtt"
+                android:hint="USERNAME NO MQTT"
+                app:hintTextColor="@color/gris"
+                app:boxBackgroundMode="outline"
+                app:startIconDrawable="@drawable/usuario_icono"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/contenidoPass">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/username_nomqtt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/gris"
+                android:inputType="text"/>
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/login"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="64dp"
+            android:enabled="true"
+            android:text="@string/action_sign_in"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/contenidoLoginCuadros"
+            app:layout_constraintVertical_bias="0.2" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/login"
+            app:layout_constraintStart_toEndOf="parent"
+            app:layout_constraintEnd_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:textSize="12dp"
+            android:text="Error de conexion, usuario o ip mqtt incorrectos"
+            android:textColor="@android:color/holo_red_dark"></TextView>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    <!--#####################  BLOQUE PARA EL LAYOUT DEL MAIN DESPUES DE LOGIN  ######################-->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:id="@+id/layout_recycler"
+        android:visibility="gone"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <com.google.android.material.appbar.AppBarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/barrasuperior"
+
+            android:theme="@style/AppTheme.AppBarOverlay">
+
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="?attr/colorPrimary"
+                app:popupTheme="@style/AppTheme.PopupOverlay" />
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/Recycler_ESP"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+
+
+    </LinearLayout>
+
+
+
+</FrameLayout>
