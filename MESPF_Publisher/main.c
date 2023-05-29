@@ -37,5 +37,5 @@ void app_main(void)
 
     mqtt_app_start();
 
-	//lcd_init();
+    lcd_init();
 }
